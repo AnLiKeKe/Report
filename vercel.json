@@ -2,9 +2,12 @@
   "version": 2,
   "builds": [
     {
-      "src": "server.py",
-      "use": "@vercel/python"
-    }
+        "src": "server.py",
+        "use": "@vercel/python",
+        "config": {
+          "runtime": "python@3.11"
+        }
+      }
   ],
   "routes": [
     {
@@ -14,5 +17,10 @@
   ],
   "env": {
     "PORT": "8000"
+  },
+  "build": {
+    "apt": {
+      "packages": ["libpq-dev"]
+    }
   }
 }
