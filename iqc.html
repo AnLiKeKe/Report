@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IQC缺陷分析</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.js"></script>
+    <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: 'Microsoft YaHei', Arial, sans-serif;
+                background: #f5f5f5;
+                padding: 20px;
+            }
+            
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                overflow: hidden;
+            }
+            
+            .header {
+                background: #1890ff;
+                color: white;
+                padding: 20px;
+                text-align: center;
+            }
+            
+            .header h1 {
+                font-size: 24px;
+                font-weight: normal;
+            }
+            
+            .controls {
+                padding: 20px;
+                background: white;
+                border-bottom: 1px solid #e8e8e8;
+                display: flex;
+                align-items: center;
+                gap: 15px;
+            }
+            
+            .controls label {
+                font-weight: bold;
+                color: #333;
+            }
+            
+            select, button {
+                padding: 8px 15px;
+                border: 1px solid #d9d9d9;
+                border-radius: 4px;
+                font-size: 14px;
+            }
+            
+            button {
+                background: #1890ff;
+                color: white;
+                border: none;
+                cursor: pointer;
+            }
+            
+            button:hover:not(:disabled) {
+                background: #40a9ff;
+            }
+            
+            button:disabled {
+                background: #d9d9d9;
+                cursor: not-allowed;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            /* 标签页导航样式 */
+            .tab-navigation {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 20px;
+                border-bottom: 2px solid #e9ecef;
+                padding-bottom: 10px;
+            }
+            
+            .tab-button {
+                padding: 10px 20px;
+                background: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 5px 5px 0 0;
+                cursor: pointer;
+                transition: all 0.3s;
+                font-weight: 500;
+                color: #333; /* 设置默认字体颜色 */
+            }
+            
+            .tab-button:hover {
+                background: #e9ecef;
+            }
+            
+            .tab-button.active {
+                background: #1890ff;
+                color: white;
+                border-color: #1890ff;
+            }
+            
+            .tab-content {
+                min-height: 400px;
+            }
+            
+            .tab-pane {
+                animation: fadeIn 0.3s ease-in-out;
+            }
+            
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            
+            .ulc-section, .ult-section, .ulh-section {
+                margin-bottom: 30px;
+                padding: 20px;
+                border: 1px solid #e8e8e8;
+                border-radius: 8px;
+                background: #fafafa;
+            }
+            
+            .ulc-section h2, .ult-section h2, .ulh-section h2 {
+                color: #1890ff;
+                margin-bottom: 20px;
+                padding-bottom: 10px;
+                border-bottom: 2px solid #e8e8e8;
+            }
+            
+            .chart-section {
+                background: white;
+                border-radius: 4px;
+                padding: 20px;
+                margin-bottom: 20px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+            
+            .chart-container {
+                position: relative;
+                height: 400px;
+            }
+            
+            .table-section {
+                background: white;
+                border-radius: 4px;
+                padding: 20px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                overflow-x: auto;
+                margin-bottom: 20px;
+            }
+            
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                min-width: 800px;
+            }
+            
+            th, td {
+                padding: 12px 8px;
+                text-align: center;
+                border: 1px solid #e8e8e8;
+                font-size: 14px;
+            }
+            
+            th {
+                background: #fafafa;
+                font-weight: bold;
+                color: #333;
+            }
+            
+            .data-column {
+                background: #f9f9f9;
+            }
+            
+            .month-header {
+                background: #e6f7ff;
+                font-weight: bold;
+            }
+            
+            .avg-header {
+                background: #fff7e6;
+                font-weight: bold;
+            }
+            
+            .loading {
+                text-align: center;
+                padding: 40px;
+                color: #999;
+            }
+            
+            .error {
+                text-align: center;
+                padding: 40px;
+                color: #ff4d4f;
+                background: #fff2f0;
+                border: 1px solid #ffccc7;
+                border-radius: 4px;
+                margin: 20px;
+            }
+        </style>
+</head>
+<body>
+    <div id="app">
+        <div class="container">
+            <div class="header">
+                <h1>IQC缺陷分析</h1>
+            </div>
+            
+            <!-- 查询条件 -->
+            <div class="controls">
+                <label>年份：</label>
+                <select v-model="selectedYear" :disabled="loadingYears">
+                    <option value="">请选择</option>
+                    <option v-for="year in availableYears" :key="year" :value="year">
+                        {{ year }}年
+                    </option>
+                </select>
+                <button @click="loadReport" :disabled="!selectedYear || loading">
+                    {{ loading ? '加载中...' : '查询' }}
+                </button>
+            </div>
+            
+            <div class="content">
+                <div v-if="loading && !reportData" class="loading">
+                    数据加载中...
+                </div>
+                
+                <div v-if="error" class="error">
+                    {{ error }}
+                </div>
+                
+                <div v-if="reportData && reportData.quartz && reportData.soda">
+                    <!-- 标签页导航 -->
+                    <div class="tab-navigation">
+                        <button 
+                            v-for="tab in tabs" 
+                            :key="tab.id" 
+                            :class="['tab-button', { active: activeTab === tab.id }]" 
+                            @click="switchTab(tab.id)">
+                            {{ tab.name }}
+                        </button>
+                    </div>
+                    
+                    <!-- 标签页内容 -->
+                    <div class="tab-content">
+                        <!-- UL标签页 -->
+                        <div v-show="activeTab === 'ul'" class="tab-pane">
+                            <!-- ULC部分 -->
+                            <div class="ulc-section">
+                                <h2>ULC</h2>
+                                <!-- 缺陷趋势对比 -->
+                                <div class="chart-section">
+                                    <h3>缺陷趋势对比</h3>
+                                    <div class="chart-container">
+                                        <canvas id="defectChart"></canvas>
+                                    </div>
+                                </div>
+                                
+                                <!-- Quartz缺陷密度（平均值） -->
+                                <div class="table-section">
+                                    <h3>Quartz缺陷密度（平均值）</h3>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th rowspan="2" class="data-column"></th>
+                                                <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
+                                                <th rowspan="2" class="avg-header">平均值</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td class="data-column">生产数</td>
+                                                <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-prod-' + data.month">{{ data.production }}</td>
+                                                <td class="avg-header">{{ reportData.quartz.avg_production }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="data-column">白缺陷</td>
+                                                <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-white-' + data.month">{{ data.white_defect }}</td>
+                                                <td class="avg-header">{{ reportData.quartz.avg_white_defect }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="data-column">黑缺陷</td>
+                                                <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-black-' + data.month">{{ data.black_defect }}</td>
+                                                <td class="avg-header">{{ reportData.quartz.avg_black_defect }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <!-- Soda缺陷密度（平均值） -->
+                                <div class="table-section">
+                                    <h3>Soda缺陷密度（平均值）</h3>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th rowspan="2" class="data-column"></th>
+                                                <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
+                                                <th rowspan="2" class="avg-header">平均值</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td class="data-column">生产数</td>
+                                                <td v-for="data in reportData.soda.monthly_data" :key="'soda-prod-' + data.month">{{ data.production }}</td>
+                                                <td class="avg-header">{{ reportData.soda.avg_production }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="data-column">白缺陷</td>
+                                                <td v-for="data in reportData.soda.monthly_data" :key="'soda-white-' + data.month">{{ data.white_defect }}</td>
+                                                <td class="avg-header">{{ reportData.soda.avg_white_defect }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="data-column">黑缺陷</td>
+                                                <td v-for="data in reportData.soda.monthly_data" :key="'soda-black-' + data.month">{{ data.black_defect }}</td>
+                                                <td class="avg-header">{{ reportData.soda.avg_black_defect }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <!-- ULT部分 -->
+                            <div class="ult-section">
+                                <h2>ULT</h2>
+                                <!-- 缺陷趋势对比 -->
+                                <div class="chart-section">
+                                    <h3>缺陷趋势对比</h3>
+                                    <div class="chart-container">
+                                        <canvas id="defectChartUlt"></canvas>
+                                    </div>
+                                </div>
+                                
+                                <!-- Quartz缺陷密度（平均值） -->
+                                <div class="table-section">
+                                    <h3>Quartz缺陷密度（平均值）</h3>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th rowspan="2" class="data-column"></th>
+                                                <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
+                                                <th rowspan="2" class="avg-header">平均值</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td class="data-column">生产数</td>
+                                                <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-prod-' + data.month">{{ data.production }}</td>
+                                                <td class="avg-header">{{ reportData.quartz.avg_production }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="data-column">白缺陷</td>
+                                                <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-white-' + data.month">{{ data.white_defect }}</td>
+                                                <td class="avg-header">{{ reportData.quartz.avg_white_defect }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="data-column">黑缺陷</td>
+                                                <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-black-' + data.month">{{ data.black_defect }}</td>
+                                                <td class="avg-header">{{ reportData.quartz.avg_black_defect }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <!-- Soda缺陷密度（平均值） -->
+                                <div class="table-section">
+                                    <h3>Soda缺陷密度（平均值）</h3>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th rowspan="2" class="data-column"></th>
+                                                <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
+                                                <th rowspan="2" class="avg-header">平均值</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td class="data-column">生产数</td>
+                                                <td v-for="data in reportData.soda.monthly_data" :key="'soda-prod-' + data.month">{{ data.production }}</td>
+                                                <td class="avg-header">{{ reportData.soda.avg_production }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="data-column">白缺陷</td>
+                                                <td v-for="data in reportData.soda.monthly_data" :key="'soda-white-' + data.month">{{ data.white_defect }}</td>
+                                                <td class="avg-header">{{ reportData.soda.avg_white_defect }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="data-column">黑缺陷</td>
+                                                <td v-for="data in reportData.soda.monthly_data" :key="'soda-black-' + data.month">{{ data.black_defect }}</td>
+                                                <td class="avg-header">{{ reportData.soda.avg_black_defect }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <!-- ULH部分 -->
+                            <div class="ulh-section">
+                                <h2>ULH</h2>
+                                <!-- 缺陷趋势对比 -->
+                                <div class="chart-section">
+                                    <h3>缺陷趋势对比</h3>
+                                    <div class="chart-container">
+                                        <canvas id="defectChartUlh"></canvas>
+                                    </div>
+                                </div>
+                                
+                                <!-- Quartz缺陷密度（平均值） -->
+                                <div class="table-section">
+                                    <h3>Quartz缺陷密度（平均值）</h3>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th rowspan="2" class="data-column"></th>
+                                                <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
+                                                <th rowspan="2" class="avg-header">平均值</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td class="data-column">生产数</td>
+                                                <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-prod-' + data.month">{{ data.production }}</td>
+                                                <td class="avg-header">{{ reportData.quartz.avg_production }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="data-column">白缺陷</td>
+                                                <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-white-' + data.month">{{ data.white_defect }}</td>
+                                                <td class="avg-header">{{ reportData.quartz.avg_white_defect }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="data-column">黑缺陷</td>
+                                                <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-black-' + data.month">{{ data.black_defect }}</td>
+                                                <td class="avg-header">{{ reportData.quartz.avg_black_defect }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <!-- Soda缺陷密度（平均值） -->
+                                <div class="table-section">
+                                    <h3>Soda缺陷密度（平均值）</h3>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th rowspan="2" class="data-column"></th>
+                                                <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
+                                                <th rowspan="2" class="avg-header">平均值</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td class="data-column">生产数</td>
+                                                <td v-for="data in reportData.soda.monthly_data" :key="'soda-prod-' + data.month">{{ data.production }}</td>
+                                                <td class="avg-header">{{ reportData.soda.avg_production }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="data-column">白缺陷</td>
+                                                <td v-for="data in reportData.soda.monthly_data" :key="'soda-white-' + data.month">{{ data.white_defect }}</td>
+                                                <td class="avg-header">{{ reportData.soda.avg_white_defect }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="data-column">黑缺陷</td>
+                                                <td v-for="data in reportData.soda.monthly_data" :key="'soda-black-' + data.month">{{ data.black_defect }}</td>
+                                                <td class="avg-header">{{ reportData.soda.avg_black_defect }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- HOYA标签页 -->
+                        <div v-show="activeTab === 'hoya'" class="tab-pane">
+                            <!-- HOYA内容 -->
+                            <!-- 折线图 -->
+                            <div class="chart-section">
+                                <h3>缺陷趋势对比</h3>
+                                <div class="chart-container">
+                                    <canvas id="defectChartHoya"></canvas>
+                                </div>
+                            </div>
+                            
+                            <div class="table-section">
+                                <h3>Quartz缺陷密度（平均值）</h3>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th rowspan="2" class="data-column"></th>
+                                            <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
+                                            <th rowspan="2" class="avg-header">平均值</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="data-column">生产数</td>
+                                            <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-prod-' + data.month">{{ data.production }}</td>
+                                            <td class="avg-header">{{ reportData.quartz.avg_production }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="data-column">白缺陷</td>
+                                            <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-white-' + data.month">{{ data.white_defect }}</td>
+                                            <td class="avg-header">{{ reportData.quartz.avg_white_defect }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="data-column">黑缺陷</td>
+                                            <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-black-' + data.month">{{ data.black_defect }}</td>
+                                            <td class="avg-header">{{ reportData.quartz.avg_black_defect }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div class="table-section">
+                                <h3>Soda缺陷密度（平均值）</h3>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th rowspan="2" class="data-column"></th>
+                                            <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
+                                            <th rowspan="2" class="avg-header">平均值</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="data-column">生产数</td>
+                                            <td v-for="data in reportData.soda.monthly_data" :key="'soda-prod-' + data.month">{{ data.production }}</td>
+                                            <td class="avg-header">{{ reportData.soda.avg_production }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="data-column">白缺陷</td>
+                                            <td v-for="data in reportData.soda.monthly_data" :key="'soda-white-' + data.month">{{ data.white_defect }}</td>
+                                            <td class="avg-header">{{ reportData.soda.avg_white_defect }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="data-column">黑缺陷</td>
+                                            <td v-for="data in reportData.soda.monthly_data" :key="'soda-black-' + data.month">{{ data.black_defect }}</td>
+                                            <td class="avg-header">{{ reportData.soda.avg_black_defect }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- SS标签页 -->
+                        <div v-show="activeTab === 'ss'" class="tab-pane">
+                            <!-- SS内容 -->
+                            <!-- 折线图 -->
+                            <div class="chart-section">
+                                <h3>缺陷趋势对比</h3>
+                                <div class="chart-container">
+                                    <canvas id="defectChartSs"></canvas>
+                                </div>
+                            </div>
+                            
+                            <div class="table-section">
+                                <h3>Quartz缺陷密度（平均值）</h3>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th rowspan="2" class="data-column"></th>
+                                            <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
+                                            <th rowspan="2" class="avg-header">平均值</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="data-column">生产数</td>
+                                            <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-prod-' + data.month">{{ data.production }}</td>
+                                            <td class="avg-header">{{ reportData.quartz.avg_production }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="data-column">白缺陷</td>
+                                            <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-white-' + data.month">{{ data.white_defect }}</td>
+                                            <td class="avg-header">{{ reportData.quartz.avg_white_defect }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="data-column">黑缺陷</td>
+                                            <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-black-' + data.month">{{ data.black_defect }}</td>
+                                            <td class="avg-header">{{ reportData.quartz.avg_black_defect }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div class="table-section">
+                                <h3>Soda缺陷密度（平均值）</h3>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th rowspan="2" class="data-column"></th>
+                                            <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
+                                            <th rowspan="2" class="avg-header">平均值</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="data-column">生产数</td>
+                                            <td v-for="data in reportData.soda.monthly_data" :key="'soda-prod-' + data.month">{{ data.production }}</td>
+                                            <td class="avg-header">{{ reportData.soda.avg_production }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="data-column">白缺陷</td>
+                                            <td v-for="data in reportData.soda.monthly_data" :key="'soda-white-' + data.month">{{ data.white_defect }}</td>
+                                            <td class="avg-header">{{ reportData.soda.avg_white_defect }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="data-column">黑缺陷</td>
+                                            <td v-for="data in reportData.soda.monthly_data" :key="'soda-black-' + data.month">{{ data.black_defect }}</td>
+                                            <td class="avg-header">{{ reportData.soda.avg_black_defect }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    selectedYear: '',
+                    availableYears: [],
+                    reportData: null,
+                    loading: false,
+                    loadingYears: false,
+                    error: null,
+                    chart: null,
+                    chartUlt: null,
+                    chartUlh: null,
+                    chartHoya: null,
+                    chartSs: null,
+                    activeTab: 'ul', // 默认激活UL标签页
+                    tabs: [
+                        { id: 'ul', name: 'UL' },
+                        { id: 'hoya', name: 'HOYA' },
+                        { id: 'ss', name: 'SS' }
+                    ]
+                }
+            },
+            
+            async mounted() {
+                console.log('Mounted hook called'); // 调试日志
+                await this.loadYears();
+                console.log('Years loaded:', this.availableYears); // 调试日志
+                // 自动选择第一个年份并加载报表数据进行调试
+                if (this.availableYears.length > 0) {
+                    this.selectedYear = this.availableYears[0];
+                    console.log('Selected year:', this.selectedYear); // 调试日志
+                    this.loadReport();
+                } else {
+                    console.log('No years available'); // 调试日志
+                }
+            },
+            
+            methods: {
+                switchTab(tabId) {
+                    this.activeTab = tabId;
+                    // 在切换标签页时重新创建图表
+                    this.$nextTick(() => {
+                        switch (tabId) {
+                            case 'ul':
+                                this.createChart();
+                                this.createChartUlt();
+                                this.createChartUlh();
+                                break;
+                            case 'hoya':
+                                this.createChartHoya();
+                                break;
+                            case 'ss':
+                                this.createChartSs();
+                                break;
+                        }
+                    });
+                },
+                async loadYears() {
+                    this.loadingYears = true;
+                    try {
+                        const response = await axios.get('http://localhost:8000/api/years');
+                        this.availableYears = response.data.years;
+                        if (this.availableYears.length > 0) {
+                            this.selectedYear = this.availableYears[0];
+                        }
+                    } catch (error) {
+                        this.availableYears = [2024, 2023, 2022];
+                        this.selectedYear = 2024;
+                    } finally {
+                        this.loadingYears = false;
+                    }
+                },
+                
+                async loadReport() {
+                    if (!this.selectedYear) return;
+                    
+                    this.loading = true;
+                    this.error = null;
+                    this.reportData = null;
+                    
+                    try {
+                        console.log(`Fetching report data for year: ${this.selectedYear}`);
+                        const response = await axios.post('http://localhost:8000/api/report', {
+                            year: parseInt(this.selectedYear)
+                        });
+                        console.log('API Response status:', response.status);
+                        console.log('API Response headers:', response.headers);
+                        console.log('API Response data length:', JSON.stringify(response.data).length);
+                        this.reportData = response.data;
+                        console.log('Report Data:', this.reportData);
+                        
+                        this.$nextTick(() => {
+                            console.log('Creating charts...');
+                            try {
+                                this.createChart();
+                                this.createChartUlt();
+                                this.createChartUlh();
+                                this.createChartHoya();
+                                this.createChartSs();
+                                console.log('All charts created successfully');
+                            } catch (chartError) {
+                                console.error('Error creating charts:', chartError);
+                                this.error = '图表渲染失败: ' + chartError.message;
+                            }
+                        });
+                    } catch (error) {
+                        console.error('API Request failed:', error);
+                        if (error.response) {
+                            console.error('Response status:', error.response.status);
+                            console.error('Response data:', error.response.data);
+                            console.error('Response headers:', error.response.headers);
+                            this.error = `获取报表数据失败 (${error.response.status}): ${error.response.data.error || error.message}`;
+                        } else if (error.request) {
+                            console.error('No response received:', error.request);
+                            this.error = '未收到服务器响应，请检查网络连接';
+                        } else {
+                            console.error('Request setup error:', error.message);
+                            this.error = '请求设置错误: ' + error.message;
+                        }
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                createChart() {
+                    console.log('Creating main chart...');
+                    try {
+                        const ctx = document.getElementById('defectChart');
+                        if (!ctx) {
+                            console.error('Main chart canvas element not found');
+                            this.error = '图表容器未找到: defectChart';
+                            return;
+                        }
+                        
+                        if (!(window.Chart)) {
+                            console.error('Chart.js library not loaded');
+                            this.error = '图表库加载失败，请刷新页面重试';
+                            return;
+                        }
+                        
+                        if (this.chart) {
+                            this.chart.destroy();
+                            console.log('Previous chart instance destroyed');
+                        }
+                        
+                        if (!this.reportData || !this.reportData.quartz || !this.reportData.quartz.monthly_data) {
+                            console.error('Invalid report data structure:', this.reportData);
+                            this.error = '报表数据格式错误，无法创建图表';
+                            return;
+                        }
+                        
+                        const labels = this.reportData.quartz.monthly_data.map(item => item.month + '月');
+                        if (!labels.length) {
+                            console.error('No labels available for chart');
+                            this.error = '没有可用的月份数据来创建图表';
+                            return;
+                        }
+                        
+                        // Quartz缺陷数据
+                        const quartzWhiteDefectData = this.reportData.quartz.monthly_data.map(item => item.white_defect);
+                        const quartzBlackDefectData = this.reportData.quartz.monthly_data.map(item => item.black_defect);
+                        
+                        // Soda缺陷数据
+                        const sodaWhiteDefectData = this.reportData.soda.monthly_data.map(item => item.white_defect);
+                        const sodaBlackDefectData = this.reportData.soda.monthly_data.map(item => item.black_defect);
+                        
+                        console.log('Chart data prepared. Labels count:', labels.length);
+                        console.log('Quartz white defects:', quartzWhiteDefectData);
+                        console.log('Quartz black defects:', quartzBlackDefectData);
+                        console.log('Soda white defects:', sodaWhiteDefectData);
+                        console.log('Soda black defects:', sodaBlackDefectData);
+                        
+                        this.chart = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: [
+                                    {
+                                        label: 'Quartz白缺陷',
+                                        data: quartzWhiteDefectData,
+                                        borderColor: '#ff7875',
+                                        backgroundColor:'rgba(255, 120, 117, 0.1)',
+                                        tension: 0.3,
+                                        fill: false
+                                    },
+                                    {
+                                        label: 'Quartz黑缺陷',
+                                        data: quartzBlackDefectData,
+                                        borderColor: '#722ed1',
+                                        backgroundColor: 'rgba(114, 46, 209, 0.1)',
+                                        tension: 0.3,
+                                        fill: false
+                                    },
+                                    {
+                                        label: 'Soda白缺陷',
+                                        data: sodaWhiteDefectData,
+                                        borderColor: '#52c41a',
+                                        backgroundColor: 'rgba(82, 96, 26, 0.7)',
+                                        tension: 0.3,
+                                        fill: false
+                                    },
+                                    {
+                                        label: 'Soda黑缺陷',
+                                        data: sodaBlackDefectData,
+                                        borderColor: '#faad14',
+                                        backgroundColor: 'rgba(250 173, 20, 0.1)',
+                                        tension: 0.3,
+                                        fill: false
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: {
+                                        position: 'top'
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        grid: {
+                                            color: '#f0f0f0'
+                                        }
+                                    },
+                                    x: {
+                                        grid: {
+                                            display: false
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                        console.log('Main chart created successfully');
+                    } catch (error) {
+                        console.error('Error creating main chart:', error);
+                        this.error = '创建图表时出错: ' + error.message;
+                    }
+                },
+                
+                createChartUlt() {
+                    console.log('Creating ULT chart...'); // 调试日志
+                    const ctx = document.getElementById('defectChartUlt');
+                    if (!ctx) {
+                        console.log('ULT chart canvas not found'); // 调试日志
+                        return;
+                    }
+                    
+                    if (this.chartUlt) {
+                        this.chartUlt.destroy();
+                    }
+                    
+                    const labels = this.reportData.quartz.monthly_data.map(item => item.month + '月');
+                    
+                    // Quartz缺陷数据
+                    const quartzWhiteDefectData = this.reportData.quartz.monthly_data.map(item => item.white_defect);
+                    const quartzBlackDefectData = this.reportData.quartz.monthly_data.map(item => item.black_defect);
+                    
+                    // Soda缺陷数据
+                    const sodaWhiteDefectData = this.reportData.soda.monthly_data.map(item => item.white_defect);
+                    const sodaBlackDefectData = this.reportData.soda.monthly_data.map(item => item.black_defect);
+                    
+                    console.log('ULT Chart data:', { labels, quartzWhiteDefectData, quartzBlackDefectData, sodaWhiteDefectData, sodaBlackDefectData }); // 调试日志
+                    
+                    this.chartUlt = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: 'Quartz白缺陷',
+                                    data: quartzWhiteDefectData,
+                                    borderColor: '#ff7875',
+                                    backgroundColor: 'rgba(255, 120, 117, 0.1)',
+                                    tension: 0.3,
+                                    fill: false
+                                },
+                                {
+                                    label: 'Quartz黑缺陷',
+                                    data: quartzBlackDefectData,
+                                    borderColor: '#722ed1',
+                                    backgroundColor: 'rgba(114, 46, 209, 0.1)',
+                                    tension: 0.3,
+                                    fill: false
+                                },
+                                {
+                                    label: 'Soda白缺陷',
+                                    data: sodaWhiteDefectData,
+                                    borderColor: '#52c41a',
+                                    backgroundColor: 'rgba(82, 196, 26, 0.1)',
+                                    tension: 0.3,
+                                    fill: false
+                                },
+                                {
+                                    label: 'Soda黑缺陷',
+                                    data: sodaBlackDefectData,
+                                    borderColor: '#faad14',
+                                    backgroundColor: 'rgba(250, 173, 20, 0.1)',
+                                    tension: 0.3,
+                                    fill: false
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'top'
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    grid: {
+                                        color: '#f0f0f0'
+                                    }
+                                },
+                                x: {
+                                    grid: {
+                                        display: false
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    console.log('ULT chart created successfully'); // 调试日志
+                },
+                
+                createChartUlh() {
+                    console.log('Creating ULH chart...'); // 调试日志
+                    const ctx = document.getElementById('defectChartUlh');
+                    if (!ctx) {
+                        console.log('ULH chart canvas not found'); // 调试日志
+                        return;
+                    }
+                    
+                    if (this.chartUlh) {
+                        this.chartUlh.destroy();
+                    }
+                    
+                    const labels = this.reportData.quartz.monthly_data.map(item => item.month + '月');
+                    
+                    // Quartz缺陷数据
+                    const quartzWhiteDefectData = this.reportData.quartz.monthly_data.map(item => item.white_defect);
+                    const quartzBlackDefectData = this.reportData.quartz.monthly_data.map(item => item.black_defect);
+                    
+                    // Soda缺陷数据
+                    const sodaWhiteDefectData = this.reportData.soda.monthly_data.map(item => item.white_defect);
+                    const sodaBlackDefectData = this.reportData.soda.monthly_data.map(item => item.black_defect);
+                    
+                    console.log('ULH Chart data:', { labels, quartzWhiteDefectData, quartzBlackDefectData, sodaWhiteDefectData, sodaBlackDefectData }); // 调试日志
+                    
+                    this.chartUlh = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: 'Quartz白缺陷',
+                                    data: quartzWhiteDefectData,
+                                    borderColor: '#ff7875',
+                                    backgroundColor: 'rgba(255, 120, 117, 0.1)',
+                                    tension: 0.3,
+                                    fill: false
+                                },
+                                {
+                                    label: 'Quartz黑缺陷',
+                                    data: quartzBlackDefectData,
+                                    borderColor: '#722ed1',
+                                    backgroundColor: 'rgba(114, 46, 209, 0.1)',
+                                    tension: 0.3,
+                                    fill: false
+                                },
+                                {
+                                    label: 'Soda白缺陷',
+                                    data: sodaWhiteDefectData,
+                                    borderColor: '#52c41a',
+                                    backgroundColor: 'rgba(82, 196, 26, 0.1)',
+                                    tension: 0.3,
+                                    fill: false
+                                },
+                                {
+                                    label: 'Soda黑缺陷',
+                                    data: sodaBlackDefectData,
+                                    borderColor: '#faad14',
+                                    backgroundColor: 'rgba(250, 173, 20, 0.1)',
+                                    tension: 0.3,
+                                    fill: false
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'top'
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    grid: {
+                                        color: '#f0f0f0'
+                                    }
+                                },
+                                x: {
+                                    grid: {
+                                        display: false
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    console.log('ULH chart created successfully'); // 调试日志
+                },
+                
+                createChartHoya() {
+                    console.log('Creating HOYA chart...'); // 调试日志
+                    const ctx = document.getElementById('defectChartHoya');
+                    if (!ctx) {
+                        console.log('HOYA chart canvas not found'); // 调试日志
+                        return;
+                    }
+                    
+                    if (this.chartHoya) {
+                        this.chartHoya.destroy();
+                    }
+                    
+                    const labels = this.reportData.quartz.monthly_data.map(item => item.month + '月');
+                    
+                    // Quartz缺陷数据
+                    const quartzWhiteDefectData = this.reportData.quartz.monthly_data.map(item => item.white_defect);
+                    const quartzBlackDefectData = this.reportData.quartz.monthly_data.map(item => item.black_defect);
+                    
+                    // Soda缺陷数据
+                    const sodaWhiteDefectData = this.reportData.soda.monthly_data.map(item => item.white_defect);
+                    const sodaBlackDefectData = this.reportData.soda.monthly_data.map(item => item.black_defect);
+                    
+                    console.log('HOYA Chart data:', { labels, quartzWhiteDefectData, quartzBlackDefectData, sodaWhiteDefectData, sodaBlackDefectData }); // 调试日志
+                    
+                    this.chartHoya = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: 'Quartz白缺陷',
+                                    data: quartzWhiteDefectData,
+                                    borderColor: '#ff7875',
+                                    backgroundColor: 'rgba(255, 120, 117, 0.1)',
+                                    tension: 0.3,
+                                    fill: false
+                                },
+                                {
+                                    label: 'Quartz黑缺陷',
+                                    data: quartzBlackDefectData,
+                                    borderColor: '#722ed1',
+                                    backgroundColor: 'rgba(114, 46, 209, 0.1)',
+                                    tension: 0.3,
+                                    fill: false
+                                },
+                                {
+                                    label: 'Soda白缺陷',
+                                    data: sodaWhiteDefectData,
+                                    borderColor: '#52c41a',
+                                    backgroundColor: 'rgba(82, 196, 26, 0.1)',
+                                    tension: 0.3,
+                                    fill: false
+                                },
+                                {
+                                    label: 'Soda黑缺陷',
+                                    data: sodaBlackDefectData,
+                                    borderColor: '#faad14',
+                                    backgroundColor: 'rgba(250, 173, 20, 0.1)',
+                                    tension: 0.3,
+                                    fill: false
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'top'
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    grid: {
+                                        color: '#f0f0f0'
+                                    }
+                                },
+                                x: {
+                                    grid: {
+                                        display: false
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    console.log('HOYA chart created successfully'); // 调试日志
+                },
+                
+                createChartSs() {
+                    console.log('Creating SS chart...'); // 调试日志
+                    const ctx = document.getElementById('defectChartSs');
+                    if (!ctx) {
+                        console.log('SS chart canvas not found'); // 调试日志
+                        return;
+                    }
+                    
+                    if (this.chartSs) {
+                        this.chartSs.destroy();
+                    }
+                    
+                    const labels = this.reportData.quartz.monthly_data.map(item => item.month + '月');
+                    
+                    // Quartz缺陷数据
+                    const quartzWhiteDefectData = this.reportData.quartz.monthly_data.map(item => item.white_defect);
+                    const quartzBlackDefectData = this.reportData.quartz.monthly_data.map(item => item.black_defect);
+                    
+                    // Soda缺陷数据
+                    const sodaWhiteDefectData = this.reportData.soda.monthly_data.map(item => item.white_defect);
+                    const sodaBlackDefectData = this.reportData.soda.monthly_data.map(item => item.black_defect);
+                    
+                    console.log('SS Chart data:', { labels, quartzWhiteDefectData, quartzBlackDefectData, sodaWhiteDefectData, sodaBlackDefectData }); // 调试日志
+                    
+                    this.chartSs = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: 'Quartz白缺陷',
+                                    data: quartzWhiteDefectData,
+                                    borderColor: '#ff7875',
+                                    backgroundColor: 'rgba(255, 120, 117, 0.1)',
+                                    tension: 0.3,
+                                    fill: false
+                                },
+                                {
+                                    label: 'Quartz黑缺陷',
+                                    data: quartzBlackDefectData,
+                                    borderColor: '#722ed1',
+                                    backgroundColor: 'rgba(114, 46, 209, 0.1)',
+                                    tension: 0.3,
+                                    fill: false
+                                },
+                                {
+                                    label: 'Soda白缺陷',
+                                    data: sodaWhiteDefectData,
+                                    borderColor: '#52c41a',
+                                    backgroundColor: 'rgba(82, 196, 26, 0.1)',
+                                    tension: 0.3,
+                                    fill: false
+                                },
+                                {
+                                    label: 'Soda黑缺陷',
+                                    data: sodaBlackDefectData,
+                                    borderColor: '#faad14',
+                                    backgroundColor: 'rgba(250, 173, 20, 0.1)',
+                                    tension: 0.3,
+                                    fill: false
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'top'
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    grid: {
+                                        color: '#f0f0f0'
+                                    }
+                                },
+                                x: {
+                                    grid: {
+                                        display: false
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    console.log('SS chart created successfully'); // 调试日志
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
