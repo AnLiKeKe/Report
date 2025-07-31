@@ -442,28 +442,69 @@ class ReportSystemHandler(http.server.SimpleHTTPRequestHandler):
                  END) AS equipment,
                 l.cd,
                 l.process_layer,
+                (CASE 
+                WHEN ((SELECT htm_no from erp_cam_design_param ecdp where ecdp.lot_name = l.lot_name order by ecdp.htm_no desc limit 1) = 2 )
+                THEN CONCAT(
+                    TO_CHAR((SELECT event_time FROM lot_history lh WHERE lh.lot_name = l.lot_name AND lh.process_seq_name = 'A2020' and lh.lot_process_state = 'Run' order by lh.event_time limit 1), 'YYYY-MM-DD HH24:MI:SS'),
+                    ';',
+                    TO_CHAR((SELECT event_time FROM lot_history lh WHERE lh.lot_name = l.lot_name AND lh.process_seq_name = 'A2022' and lh.lot_process_state = 'Run' order by lh.event_time limit 1), 'YYYY-MM-DD HH24:MI:SS')
+                )
+                ELSE TO_CHAR((SELECT event_time FROM lot_history lh WHERE lh.lot_name = l.lot_name AND lh.process_seq_name = 'A2020' and lh.lot_process_state = 'Run' order by lh.event_time limit 1), 'YYYY-MM-DD HH24:MI:SS')
+             END) AS locktime,
                 l.material_id,
                 cd.vendor,
                 l.lot_type,
-                concat(l.product_size, 'mm') as product_size,
-                 (SELECT count(aafi.sno) FROM analyze_aoi_field_item aafi 
-                 LEFT JOIN analyze_aoi_field aaf ON aaf.id = aafi.af_id 
-                 WHERE aafi.kind IN ('A1','A2','A3','A4') 
-                 AND aaf.process_flow_seq_name = 'C4010' 
-                 AND l.lot_name = aaf.order_no) AS black,
-                (SELECT count(aafi.sno) FROM analyze_aoi_field_item aafi 
-                 LEFT JOIN analyze_aoi_field aaf ON aaf.id = aafi.af_id 
-                 WHERE aafi.kind IN ('B1','B2','B3','B4') 
-                 AND aaf.process_flow_seq_name = 'C4010' 
-                 AND l.lot_name = aaf.order_no) AS white,
-                l.event_time as lock_time,
-                l.product_type,
-                l.location_name,
-                l.prod_id,
-                l.outsource_vender,
-                l.real_minimum_seam,
-                l.batch_id,
-                l.factory_name
+                l.product_size as product_size,
+				(CASE 
+        		WHEN ((SELECT htm_no FROM erp_cam_design_param ecdp WHERE ecdp.lot_name = l.lot_name ORDER BY ecdp.htm_no DESC LIMIT 1) = 2)
+        		THEN 
+           		 (SELECT count(aafi.sno)::text 
+           	 	 FROM analyze_aoi_field_item aafi 
+            	 LEFT JOIN analyze_aoi_field aaf ON aaf.id = aafi.af_id 
+            	 WHERE aafi.kind IN ('A1','A2','A3','A4') 
+            	   AND aaf.process_flow_seq_name = 'C4010' 
+            	   AND l.lot_name = aaf.order_no)
+          	  || ';' || 
+          	  (SELECT count(aafi.sno)::text 
+            	 FROM analyze_aoi_field_item aafi 
+           	  LEFT JOIN analyze_aoi_field aaf ON aaf.id = aafi.af_id 
+           	  WHERE aafi.kind IN ('A1','A2','A3','A4') 
+            	   AND aaf.process_flow_seq_name = 'C4017' 
+            	   AND l.lot_name = aaf.order_no)
+       		 ELSE 
+            (SELECT count(aafi.sno)::text 
+             FROM analyze_aoi_field_item aafi 
+             LEFT JOIN analyze_aoi_field aaf ON aaf.id = aafi.af_id 
+             WHERE aafi.kind IN ('A1','A2','A3','A4') 
+               AND aaf.process_flow_seq_name = 'C4010' 
+               AND l.lot_name = aaf.order_no)
+    		END) AS black,
+            	(CASE 
+        		WHEN ((SELECT htm_no FROM erp_cam_design_param ecdp WHERE ecdp.lot_name = l.lot_name ORDER BY ecdp.htm_no DESC LIMIT 1) = 2)
+        		THEN 
+           		 (SELECT count(aafi.sno)::text 
+           	 	 FROM analyze_aoi_field_item aafi 
+            	 LEFT JOIN analyze_aoi_field aaf ON aaf.id = aafi.af_id 
+            	 WHERE aafi.kind IN ('B1','B2','B3','B4') 
+            	   AND aaf.process_flow_seq_name = 'C4010' 
+            	   AND l.lot_name = aaf.order_no)
+          	  || ';' || 
+          	  (SELECT count(aafi.sno)::text 
+            	 FROM analyze_aoi_field_item aafi 
+           	  LEFT JOIN analyze_aoi_field aaf ON aaf.id = aafi.af_id 
+           	  WHERE aafi.kind IN ('B1','B2','B3','B4') 
+            	   AND aaf.process_flow_seq_name = 'C4017' 
+            	   AND l.lot_name = aaf.order_no)
+       		 ELSE 
+            (SELECT count(aafi.sno)::text 
+             FROM analyze_aoi_field_item aafi 
+             LEFT JOIN analyze_aoi_field aaf ON aaf.id = aafi.af_id 
+             WHERE aafi.kind IN ('B1','B2','B3','B4') 
+               AND aaf.process_flow_seq_name = 'C4010' 
+               AND l.lot_name = aaf.order_no)
+    		END)  AS white,
+                l.event_time as repairtime,
+                l.product_type
             FROM 
                 lot l 
                 INNER JOIN consumable_def cd ON l.material_def_id = cd.consumable_def_name
@@ -473,7 +514,7 @@ class ReportSystemHandler(http.server.SimpleHTTPRequestHandler):
                 AND l.material_id IS NOT NULL
                 AND l.lot_name IS NOT NULL
                 AND l.lot_name != ''
-            ORDER BY l.event_time DESC
+            ORDER BY l.event_time desc
             """
             
             # 移除动态过滤条件以解决参数不匹配问题
@@ -500,7 +541,7 @@ class ReportSystemHandler(http.server.SimpleHTTPRequestHandler):
                         'equipment': str(row_dict.get('equipment', '') or ''),
                         'cd': str(row_dict.get('cd', '') or ''),
                         'layer': str(row_dict.get('process_layer', '') or ''),
-                        'lockTime': row_dict.get('event_time').strftime('%Y-%m-%d') if row_dict.get('event_time') else '',
+                        'lockTime': str(row_dict.get('locktime', '') or '') ,
                         'batchNumber': str(row_dict.get('material_id', '') or ''),
                         'supplier': str(row_dict.get('vendor', '') or ''),
                         'orderType': str(row_dict.get('lot_type', '') or ''),
@@ -508,15 +549,15 @@ class ReportSystemHandler(http.server.SimpleHTTPRequestHandler):
                         'blackDefect':str(row_dict.get('black', '') or ''),
                         'whiteDefect':str(row_dict.get('white', '') or ''),
                         'repairTime': 0,
-                        'judgeType': str(row_dict.get('product_type', '') or ''),
-                        'glassSource': str(row_dict.get('location_name', '') or ''),
-                        'polishSupplier': str(row_dict.get('prod_id', '') or ''),
-                        'chromeSupplier': str(row_dict.get('outsource_vender', '') or ''),
-                        'glueSupplier': str(row_dict.get('outsource_vender', '') or ''),
-                        'recycleStatus': str(row_dict.get('real_minimum_seam', '') or ''),
-                        'reprocessPlan': str(row_dict.get('customer_application', '') or ''),
-                        'recycleBatch': str(row_dict.get('batch_id', '') or ''),
-                        'factory': str(row_dict.get('factory_name', '') or ''),
+                        'judgeType': '',
+                        'glassSource': '',
+                        'polishSupplier': '',
+                        'chromeSupplier': '',
+                        'glueSupplier': '',
+                        'recycleStatus': '',
+                        'reprocessPlan': '',
+                        'recycleBatch':  '',
+                        'factory': 'FS',
                         'year': row_dict.get('create_date').year if row_dict.get('create_date') else datetime.now().year
                     })
                 except Exception as e:
