@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IQC缺陷分析</title>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="vue.global.js"></script>
+    <script src="axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <style>
             * {
@@ -947,8 +947,20 @@
                         }
                         
                         // 获取主图表供应商的数据（默认使用总体数据）
-                        const quartzData = this.reportData.quartz.monthly_data;
-                        const sodaData = this.reportData.soda.monthly_data;
+                        let quartzData, sodaData;
+                        
+                        // 检查ULC供应商是否存在
+                        if (this.reportData.vendors.find(vendor => vendor === 'ULC') && 
+                            this.reportData.quartz.vendor_data['ULC'] && 
+                            this.reportData.soda.vendor_data['ULC']) {
+                            console.log('Using ULC vendor data'); // 调试日志
+                            quartzData = this.reportData.quartz.vendor_data['ULC'];
+                            sodaData = this.reportData.soda.vendor_data['ULC'];
+                        } else {
+                            console.log('Using default data'); // 调试日志
+                            quartzData = this.reportData.quartz.monthly_data;
+                            sodaData = this.reportData.soda.monthly_data;
+                        }
                         
                         const labels = quartzData.map(item => item.month + '月');
                         if (!labels.length) {
@@ -965,6 +977,9 @@
                         const sodaWhiteDefectData = sodaData.map(item => item.white_defect);
                         const sodaBlackDefectData = sodaData.map(item => item.black_defect);
                         
+                        // 过滤掉值为0的数据点
+                        const filterZeroValues = (data) => data.map(value => value === 0 ? null : value);
+                        
                         console.log('Chart data prepared. Labels count:', labels.length);
                         console.log('Quartz white defects:', quartzWhiteDefectData);
                         console.log('Quartz black defects:', quartzBlackDefectData);
@@ -978,7 +993,7 @@
                                 datasets: [
                                     {
                                         label: 'Quartz白缺陷',
-                                        data: quartzWhiteDefectData,
+                                        data: filterZeroValues(quartzWhiteDefectData),
                                         borderColor: '#ff7875',
                                         backgroundColor:'rgba(255, 120, 117, 0.1)',
                                         tension: 0.3,
@@ -986,7 +1001,7 @@
                                     },
                                     {
                                         label: 'Quartz黑缺陷',
-                                        data: quartzBlackDefectData,
+                                        data: filterZeroValues(quartzBlackDefectData),
                                         borderColor: '#722ed1',
                                         backgroundColor: 'rgba(114, 46, 209, 0.1)',
                                         tension: 0.3,
@@ -994,7 +1009,7 @@
                                     },
                                     {
                                         label: 'Soda白缺陷',
-                                        data: sodaWhiteDefectData,
+                                        data: filterZeroValues(sodaWhiteDefectData),
                                         borderColor: '#52c41a',
                                         backgroundColor: 'rgba(82, 196, 26, 0.1)',
                                         tension: 0.3,
@@ -1002,7 +1017,7 @@
                                     },
                                     {
                                         label: 'Soda黑缺陷',
-                                        data: sodaBlackDefectData,
+                                        data: filterZeroValues(sodaBlackDefectData),
                                         borderColor: '#faad14',
                                         backgroundColor: 'rgba(250, 173, 20, 0.1)',
                                         tension: 0.3,
@@ -1056,16 +1071,62 @@
                     let quartzData, sodaData;
                     
                     // 检查ULT供应商是否存在
-                    if (this.reportData.vendors.find(vendor => vendor === 'ULT') && 
+                    const hasUltData = this.reportData.vendors.find(vendor => vendor === 'ULT') && 
                         this.reportData.quartz.vendor_data['ULT'] && 
-                        this.reportData.soda.vendor_data['ULT']) {
+                        this.reportData.soda.vendor_data['ULT'];
+                        
+                    if (hasUltData) {
                         console.log('Using ULT vendor data'); // 调试日志
                         quartzData = this.reportData.quartz.vendor_data['ULT'];
                         sodaData = this.reportData.soda.vendor_data['ULT'];
                     } else {
                         console.log('Using default data for ULT'); // 调试日志
-                        quartzData = this.reportData.quartz.monthly_data;
-                        sodaData = this.reportData.soda.monthly_data;
+                        // 当没有ULT供应商数据时，创建空数据
+                        quartzData = this.reportData.quartz.monthly_data.map(item => ({
+                            ...item,
+                            production: 0,
+                            white_defect: 0,
+                            black_defect: 0
+                        }));
+                        sodaData = this.reportData.soda.monthly_data.map(item => ({
+                            ...item,
+                            production: 0,
+                            white_defect: 0,
+                            black_defect: 0
+                        }));
+                    }
+                    
+                    // 更新表格数据
+                    if (!hasUltData) {
+                        // 如果没有ULT供应商数据，则创建一个空的数据结构供表格使用
+                        if (!this.reportData.vendors.includes('ULT')) {
+                            this.reportData.vendors.push('ULT');
+                        }
+                        
+                        if (!this.reportData.quartz.vendor_data['ULT']) {
+                            this.reportData.quartz.vendor_data['ULT'] = quartzData;
+                        }
+                        
+                        if (!this.reportData.soda.vendor_data['ULT']) {
+                            this.reportData.soda.vendor_data['ULT'] = sodaData;
+                        }
+                        
+                        // 更新平均值
+                        if (!this.reportData.quartz.vendor_averages['ULT']) {
+                            this.reportData.quartz.vendor_averages['ULT'] = {
+                                avg_production: 0,
+                                avg_white_defect: 0,
+                                avg_black_defect: 0
+                            };
+                        }
+                        
+                        if (!this.reportData.soda.vendor_averages['ULT']) {
+                            this.reportData.soda.vendor_averages['ULT'] = {
+                                avg_production: 0,
+                                avg_white_defect: 0,
+                                avg_black_defect: 0
+                            };
+                        }
                     }
                     
                     const labels = quartzData.map(item => item.month + '月');
@@ -1078,6 +1139,9 @@
                     const sodaWhiteDefectData = sodaData.map(item => item.white_defect);
                     const sodaBlackDefectData = sodaData.map(item => item.black_defect);
                     
+                    // 过滤掉值为0的数据点
+                    const filterZeroValues = (data) => data.map(value => value === 0 ? null : value);
+                    
                     console.log('ULT Chart data:', { labels, quartzWhiteDefectData, quartzBlackDefectData, sodaWhiteDefectData, sodaBlackDefectData }); // 调试日志
                     
                     this.chartUlt = new Chart(ctx, {
@@ -1087,7 +1151,7 @@
                             datasets: [
                                 {
                                     label: 'Quartz白缺陷',
-                                    data: quartzWhiteDefectData,
+                                    data: filterZeroValues(quartzWhiteDefectData),
                                     borderColor: '#ff7875',
                                     backgroundColor: 'rgba(255, 120, 117, 0.1)',
                                     tension: 0.3,
@@ -1095,7 +1159,7 @@
                                 },
                                 {
                                     label: 'Quartz黑缺陷',
-                                    data: quartzBlackDefectData,
+                                    data: filterZeroValues(quartzBlackDefectData),
                                     borderColor: '#722ed1',
                                     backgroundColor: 'rgba(114, 46, 209, 0.1)',
                                     tension: 0.3,
@@ -1103,7 +1167,7 @@
                                 },
                                 {
                                     label: 'Soda白缺陷',
-                                    data: sodaWhiteDefectData,
+                                    data: filterZeroValues(sodaWhiteDefectData),
                                     borderColor: '#52c41a',
                                     backgroundColor: 'rgba(82, 196, 26, 0.1)',
                                     tension: 0.3,
@@ -1111,7 +1175,7 @@
                                 },
                                 {
                                     label: 'Soda黑缺陷',
-                                    data: sodaBlackDefectData,
+                                    data: filterZeroValues(sodaBlackDefectData),
                                     borderColor: '#faad14',
                                     backgroundColor: 'rgba(250, 173, 20, 0.1)',
                                     tension: 0.3,
@@ -1161,16 +1225,62 @@
                     let quartzData, sodaData;
                     
                     // 检查ULH供应商是否存在
-                    if (this.reportData.vendors.find(vendor => vendor === 'ULH') && 
+                    const hasUlhData = this.reportData.vendors.find(vendor => vendor === 'ULH') && 
                         this.reportData.quartz.vendor_data['ULH'] && 
-                        this.reportData.soda.vendor_data['ULH']) {
+                        this.reportData.soda.vendor_data['ULH'];
+                        
+                    if (hasUlhData) {
                         console.log('Using ULH vendor data'); // 调试日志
                         quartzData = this.reportData.quartz.vendor_data['ULH'];
                         sodaData = this.reportData.soda.vendor_data['ULH'];
                     } else {
                         console.log('Using default data for ULH'); // 调试日志
-                        quartzData = this.reportData.quartz.monthly_data;
-                        sodaData = this.reportData.soda.monthly_data;
+                        // 当没有ULH供应商数据时，创建空数据
+                        quartzData = this.reportData.quartz.monthly_data.map(item => ({
+                            ...item,
+                            production: 0,
+                            white_defect: 0,
+                            black_defect: 0
+                        }));
+                        sodaData = this.reportData.soda.monthly_data.map(item => ({
+                            ...item,
+                            production: 0,
+                            white_defect: 0,
+                            black_defect: 0
+                        }));
+                    }
+                    
+                    // 更新表格数据
+                    if (!hasUlhData) {
+                        // 如果没有ULH供应商数据，则创建一个空的数据结构供表格使用
+                        if (!this.reportData.vendors.includes('ULH')) {
+                            this.reportData.vendors.push('ULH');
+                        }
+                        
+                        if (!this.reportData.quartz.vendor_data['ULH']) {
+                            this.reportData.quartz.vendor_data['ULH'] = quartzData;
+                        }
+                        
+                        if (!this.reportData.soda.vendor_data['ULH']) {
+                            this.reportData.soda.vendor_data['ULH'] = sodaData;
+                        }
+                        
+                        // 更新平均值
+                        if (!this.reportData.quartz.vendor_averages['ULH']) {
+                            this.reportData.quartz.vendor_averages['ULH'] = {
+                                avg_production: 0,
+                                avg_white_defect: 0,
+                                avg_black_defect: 0
+                            };
+                        }
+                        
+                        if (!this.reportData.soda.vendor_averages['ULH']) {
+                            this.reportData.soda.vendor_averages['ULH'] = {
+                                avg_production: 0,
+                                avg_white_defect: 0,
+                                avg_black_defect: 0
+                            };
+                        }
                     }
                     
                     const labels = quartzData.map(item => item.month + '月');
@@ -1183,6 +1293,9 @@
                     const sodaWhiteDefectData = sodaData.map(item => item.white_defect);
                     const sodaBlackDefectData = sodaData.map(item => item.black_defect);
                     
+                    // 过滤掉值为0的数据点
+                    const filterZeroValues = (data) => data.map(value => value === 0 ? null : value);
+                    
                     console.log('ULH Chart data:', { labels, quartzWhiteDefectData, quartzBlackDefectData, sodaWhiteDefectData, sodaBlackDefectData }); // 调试日志
                     
                     this.chartUlh = new Chart(ctx, {
@@ -1192,7 +1305,7 @@
                             datasets: [
                                 {
                                     label: 'Quartz白缺陷',
-                                    data: quartzWhiteDefectData,
+                                    data: filterZeroValues(quartzWhiteDefectData),
                                     borderColor: '#ff7875',
                                     backgroundColor: 'rgba(255, 120, 117, 0.1)',
                                     tension: 0.3,
@@ -1200,7 +1313,7 @@
                                 },
                                 {
                                     label: 'Quartz黑缺陷',
-                                    data: quartzBlackDefectData,
+                                    data: filterZeroValues(quartzBlackDefectData),
                                     borderColor: '#722ed1',
                                     backgroundColor: 'rgba(114, 46, 209, 0.1)',
                                     tension: 0.3,
@@ -1208,7 +1321,7 @@
                                 },
                                 {
                                     label: 'Soda白缺陷',
-                                    data: sodaWhiteDefectData,
+                                    data: filterZeroValues(sodaWhiteDefectData),
                                     borderColor: '#52c41a',
                                     backgroundColor: 'rgba(82, 196, 26, 0.1)',
                                     tension: 0.3,
@@ -1216,7 +1329,7 @@
                                 },
                                 {
                                     label: 'Soda黑缺陷',
-                                    data: sodaBlackDefectData,
+                                    data: filterZeroValues(sodaBlackDefectData),
                                     borderColor: '#faad14',
                                     backgroundColor: 'rgba(250, 173, 20, 0.1)',
                                     tension: 0.3,
@@ -1282,6 +1395,9 @@
                     const sodaWhiteDefectData = sodaData.map(item => item.white_defect);
                     const sodaBlackDefectData = sodaData.map(item => item.black_defect);
                     
+                    // 过滤掉值为0的数据点
+                    const filterZeroValues = (data) => data.map(value => value === 0 ? null : value);
+                    
                     console.log('HOYA Chart data:', { labels, quartzWhiteDefectData, quartzBlackDefectData, sodaWhiteDefectData, sodaBlackDefectData }); // 调试日志
                     
                     this.chartHoya = new Chart(ctx, {
@@ -1291,7 +1407,7 @@
                             datasets: [
                                 {
                                     label: 'Quartz白缺陷',
-                                    data: quartzWhiteDefectData,
+                                    data: filterZeroValues(quartzWhiteDefectData),
                                     borderColor: '#ff7875',
                                     backgroundColor: 'rgba(255, 120, 117, 0.1)',
                                     tension: 0.3,
@@ -1299,7 +1415,7 @@
                                 },
                                 {
                                     label: 'Quartz黑缺陷',
-                                    data: quartzBlackDefectData,
+                                    data: filterZeroValues(quartzBlackDefectData),
                                     borderColor: '#722ed1',
                                     backgroundColor: 'rgba(114, 46, 209, 0.1)',
                                     tension: 0.3,
@@ -1307,7 +1423,7 @@
                                 },
                                 {
                                     label: 'Soda白缺陷',
-                                    data: sodaWhiteDefectData,
+                                    data: filterZeroValues(sodaWhiteDefectData),
                                     borderColor: '#52c41a',
                                     backgroundColor: 'rgba(82, 196, 26, 0.1)',
                                     tension: 0.3,
@@ -1315,7 +1431,7 @@
                                 },
                                 {
                                     label: 'Soda黑缺陷',
-                                    data: sodaBlackDefectData,
+                                    data: filterZeroValues(sodaBlackDefectData),
                                     borderColor: '#faad14',
                                     backgroundColor: 'rgba(250, 173, 20, 0.1)',
                                     tension: 0.3,
@@ -1381,6 +1497,9 @@
                     const sodaWhiteDefectData = sodaData.map(item => item.white_defect);
                     const sodaBlackDefectData = sodaData.map(item => item.black_defect);
                     
+                    // 过滤掉值为0的数据点
+                    const filterZeroValues = (data) => data.map(value => value === 0 ? null : value);
+                    
                     console.log('S&S Chart data:', { labels, quartzWhiteDefectData, quartzBlackDefectData, sodaWhiteDefectData, sodaBlackDefectData }); // 调试日志
                     
                     this.chartSs = new Chart(ctx, {
@@ -1390,7 +1509,7 @@
                             datasets: [
                                 {
                                     label: 'Quartz白缺陷',
-                                    data: quartzWhiteDefectData,
+                                    data: filterZeroValues(quartzWhiteDefectData),
                                     borderColor: '#ff7875',
                                     backgroundColor: 'rgba(255, 120, 117, 0.1)',
                                     tension: 0.3,
@@ -1398,7 +1517,7 @@
                                 },
                                 {
                                     label: 'Quartz黑缺陷',
-                                    data: quartzBlackDefectData,
+                                    data: filterZeroValues(quartzBlackDefectData),
                                     borderColor: '#722ed1',
                                     backgroundColor: 'rgba(114, 46, 209, 0.1)',
                                     tension: 0.3,
@@ -1406,7 +1525,7 @@
                                 },
                                 {
                                     label: 'Soda白缺陷',
-                                    data: sodaWhiteDefectData,
+                                    data: filterZeroValues(sodaWhiteDefectData),
                                     borderColor: '#52c41a',
                                     backgroundColor: 'rgba(82, 196, 26, 0.1)',
                                     tension: 0.3,
@@ -1414,7 +1533,7 @@
                                 },
                                 {
                                     label: 'Soda黑缺陷',
-                                    data: sodaBlackDefectData,
+                                    data: filterZeroValues(sodaBlackDefectData),
                                     borderColor: '#faad14',
                                     backgroundColor: 'rgba(250, 173, 20, 0.1)',
                                     tension: 0.3,

@@ -315,10 +315,10 @@ class ReportSystemHandler(http.server.SimpleHTTPRequestHandler):
             for month in range(1, 13):
                 if month in material_data['Quartz']:
                     data = material_data['Quartz'][month].copy()
-                    # 计算平均缺陷值（基于所有供应商的平均值）
-                    vendor_count = len(data['vendors'])
-                    data['white_defect'] = round(data['white_defect'] / vendor_count, 2) if vendor_count > 0 else 0
-                    data['black_defect'] = round(data['black_defect'] / vendor_count, 2) if vendor_count > 0 else 0
+                    # 按生产数量加权平均计算缺陷值
+                    total_production = data['production']
+                    data['white_defect'] = round(data['white_defect'] / total_production, 2) if total_production > 0 else 0
+                    data['black_defect'] = round(data['black_defect'] / total_production, 2) if total_production > 0 else 0
                     report_data['quartz']['monthly_data'].append(data)
                     total_quartz_production += data['production']
                     total_quartz_white += data['white_defect']
@@ -385,10 +385,10 @@ class ReportSystemHandler(http.server.SimpleHTTPRequestHandler):
             for month in range(1, 13):
                 if month in material_data['Soda']:
                     data = material_data['Soda'][month].copy()
-                    # 计算平均缺陷值（基于所有供应商的平均值）
-                    vendor_count = len(data['vendors'])
-                    data['white_defect'] = round(data['white_defect'] / vendor_count, 2) if vendor_count > 0 else 0
-                    data['black_defect'] = round(data['black_defect'] / vendor_count, 2) if vendor_count > 0 else 0
+                    # 按生产数量加权平均计算缺陷值
+                    total_production = data['production']
+                    data['white_defect'] = round(data['white_defect'] / total_production, 2) if total_production > 0 else 0
+                    data['black_defect'] = round(data['black_defect'] / total_production, 2) if total_production > 0 else 0
                     report_data['soda']['monthly_data'].append(data)
                     total_soda_production += data['production']
                     total_soda_white += data['white_defect']
