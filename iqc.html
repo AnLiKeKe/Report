@@ -6,7 +6,7 @@
     <title>IQC缺陷分析</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <style>
             * {
                 margin: 0;
@@ -271,65 +271,95 @@
                                 
                                 <!-- Quartz缺陷密度（平均值） -->
                                 <div class="table-section">
-                                    <h3>Quartz缺陷密度（平均值）</h3>
-                                    <table>
-                                        <thead>
-                                            <tr>
-                                                <th rowspan="2" class="data-column"></th>
-                                                <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
-                                                <th rowspan="2" class="avg-header">平均值</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td class="data-column">生产数</td>
-                                                <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-prod-' + data.month">{{ data.production }}</td>
-                                                <td class="avg-header">{{ reportData.quartz.avg_production }}</td>
-                                            </tr>
-                                            <tr>
-                                                <td class="data-column">白缺陷</td>
-                                                <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-white-' + data.month">{{ data.white_defect }}</td>
-                                                <td class="avg-header">{{ reportData.quartz.avg_white_defect }}</td>
-                                            </tr>
-                                            <tr>
-                                                <td class="data-column">黑缺陷</td>
-                                                <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-black-' + data.month">{{ data.black_defect }}</td>
-                                                <td class="avg-header">{{ reportData.quartz.avg_black_defect }}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
+                                <h3>Quartz缺陷密度（平均值）</h3>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th rowspan="2" class="data-column"></th>
+                                            <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
+                                            <th rowspan="2" class="avg-header">平均值</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-if="reportData.vendors.find(vendor => vendor === 'ULC') && reportData.quartz.vendor_data['ULC']">
+                                    <td class="data-column">生产数</td>
+                                    <td v-for="data in reportData.quartz.vendor_data['ULC']" :key="'ulc-quartz-prod-' + data.month">{{ data.production }}</td>
+                                    <td class="avg-header">{{ reportData.quartz.vendor_averages['ULC'].avg_production }}</td>
+                                </tr>
+                                <tr v-else>
+                                            <td class="data-column">生产数</td>
+                                            <td v-for="n in 12" :key="'quartz-prod-' + n">0</td>
+                                            <td class="avg-header">0</td>
+                                        </tr>
+                                <tr v-if="reportData.vendors.find(vendor => vendor === 'ULC') && reportData.quartz.vendor_data['ULC']">
+                                    <td class="data-column">白缺陷</td>
+                                    <td v-for="data in reportData.quartz.vendor_data['ULC']" :key="'ulc-quartz-white-' + data.month">{{ data.white_defect.toFixed(3) }}</td>
+                                    <td class="avg-header">{{ reportData.quartz.vendor_averages['ULC'].avg_white_defect.toFixed(3) }}</td>
+                                </tr>
+                                <tr v-else>
+                                            <td class="data-column">白缺陷</td>
+                                            <td v-for="n in 12" :key="'quartz-white-' + n">0.000</td>
+                                            <td class="avg-header">0.000</td>
+                                        </tr>
+                                <tr v-if="reportData.vendors.find(vendor => vendor === 'ULC') && reportData.quartz.vendor_data['ULC']">
+                                    <td class="data-column">黑缺陷</td>
+                                    <td v-for="data in reportData.quartz.vendor_data['ULC']" :key="'ulc-quartz-black-' + data.month">{{ data.black_defect.toFixed(3) }}</td>
+                                    <td class="avg-header">{{ reportData.quartz.vendor_averages['ULC'].avg_black_defect.toFixed(3) }}</td>
+                                </tr>
+                                <tr v-else>
+                                            <td class="data-column">黑缺陷</td>
+                                            <td v-for="n in 12" :key="'quartz-black-' + n">0.000</td>
+                                            <td class="avg-header">0.000</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                                 
                                 <!-- Soda缺陷密度（平均值） -->
                                 <div class="table-section">
-                                    <h3>Soda缺陷密度（平均值）</h3>
-                                    <table>
-                                        <thead>
-                                            <tr>
-                                                <th rowspan="2" class="data-column"></th>
-                                                <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
-                                                <th rowspan="2" class="avg-header">平均值</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td class="data-column">生产数</td>
-                                                <td v-for="data in reportData.soda.monthly_data" :key="'soda-prod-' + data.month">{{ data.production }}</td>
-                                                <td class="avg-header">{{ reportData.soda.avg_production }}</td>
-                                            </tr>
-                                            <tr>
-                                                <td class="data-column">白缺陷</td>
-                                                <td v-for="data in reportData.soda.monthly_data" :key="'soda-white-' + data.month">{{ data.white_defect }}</td>
-                                                <td class="avg-header">{{ reportData.soda.avg_white_defect }}</td>
-                                            </tr>
-                                            <tr>
-                                                <td class="data-column">黑缺陷</td>
-                                                <td v-for="data in reportData.soda.monthly_data" :key="'soda-black-' + data.month">{{ data.black_defect }}</td>
-                                                <td class="avg-header">{{ reportData.soda.avg_black_defect }}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
+                                <h3>Soda缺陷密度（平均值）</h3>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th rowspan="2" class="data-column"></th>
+                                            <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
+                                            <th rowspan="2" class="avg-header">平均值</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-if="reportData.vendors.find(vendor => vendor === 'ULC') && reportData.soda.vendor_data['ULC']">
+                                    <td class="data-column">生产数</td>
+                                    <td v-for="data in reportData.soda.vendor_data['ULC']" :key="'ulc-soda-prod-' + data.month">{{ data.production }}</td>
+                                    <td class="avg-header">{{ reportData.soda.vendor_averages['ULC'].avg_production }}</td>
+                                </tr>
+                                <tr v-else>
+                                    <td class="data-column">生产数</td>
+                                    <td v-for="n in 12" :key="'soda-prod-' + n">0</td>
+                                    <td class="avg-header">0</td>
+                                </tr>
+                                <tr v-if="reportData.vendors.find(vendor => vendor === 'ULC') && reportData.soda.vendor_data['ULC']">
+                                    <td class="data-column">白缺陷</td>
+                                    <td v-for="data in reportData.soda.vendor_data['ULC']" :key="'ulc-soda-white-' + data.month">{{ data.white_defect.toFixed(3) }}</td>
+                                    <td class="avg-header">{{ reportData.soda.vendor_averages['ULC'].avg_white_defect.toFixed(3) }}</td>
+                                </tr>
+                                <tr v-else>
+                                    <td class="data-column">白缺陷</td>
+                                    <td v-for="n in 12" :key="'soda-white-' + n">0.000</td>
+                                    <td class="avg-header">0.000</td>
+                                </tr>
+                                <tr v-if="reportData.vendors.find(vendor => vendor === 'ULC') && reportData.soda.vendor_data['ULC']">
+                                    <td class="data-column">黑缺陷</td>
+                                    <td v-for="data in reportData.soda.vendor_data['ULC']" :key="'ulc-soda-black-' + data.month">{{ data.black_defect.toFixed(3) }}</td>
+                                    <td class="avg-header">{{ reportData.soda.vendor_averages['ULC'].avg_black_defect.toFixed(3) }}</td>
+                                </tr>
+                                <tr v-else>
+                                    <td class="data-column">黑缺陷</td>
+                                    <td v-for="n in 12" :key="'soda-black-' + n">0.000</td>
+                                    <td class="avg-header">0.000</td>
+                                </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                             </div>
                             
                             <!-- ULT部分 -->
@@ -345,65 +375,95 @@
                                 
                                 <!-- Quartz缺陷密度（平均值） -->
                                 <div class="table-section">
-                                    <h3>Quartz缺陷密度（平均值）</h3>
-                                    <table>
-                                        <thead>
-                                            <tr>
-                                                <th rowspan="2" class="data-column"></th>
-                                                <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
-                                                <th rowspan="2" class="avg-header">平均值</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td class="data-column">生产数</td>
-                                                <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-prod-' + data.month">{{ data.production }}</td>
-                                                <td class="avg-header">{{ reportData.quartz.avg_production }}</td>
-                                            </tr>
-                                            <tr>
-                                                <td class="data-column">白缺陷</td>
-                                                <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-white-' + data.month">{{ data.white_defect }}</td>
-                                                <td class="avg-header">{{ reportData.quartz.avg_white_defect }}</td>
-                                            </tr>
-                                            <tr>
-                                                <td class="data-column">黑缺陷</td>
-                                                <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-black-' + data.month">{{ data.black_defect }}</td>
-                                                <td class="avg-header">{{ reportData.quartz.avg_black_defect }}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
+                            <h3>Quartz缺陷密度（平均值）</h3>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th rowspan="2" class="data-column"></th>
+                                        <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
+                                        <th rowspan="2" class="avg-header">平均值</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-if="reportData.vendors.find(vendor => vendor === 'ULT') && reportData.quartz.vendor_data['ULT']">
+                                        <td class="data-column">生产数</td>
+                                        <td v-for="data in reportData.quartz.vendor_data['ULT']" :key="'ult-quartz-prod-' + data.month">{{ data.production }}</td>
+                                        <td class="avg-header">{{ reportData.quartz.vendor_averages['ULT'].avg_production }}</td>
+                                    </tr>
+                                    <tr v-else>
+                                        <td class="data-column">生产数</td>
+                                        <td v-for="n in 12" :key="'quartz-prod-' + n">0</td>
+                                        <td class="avg-header">0</td>
+                                    </tr>
+                                    <tr v-if="reportData.vendors.find(vendor => vendor === 'ULT') && reportData.quartz.vendor_data['ULT']">
+                                        <td class="data-column">白缺陷</td>
+                                        <td v-for="data in reportData.quartz.vendor_data['ULT']" :key="'ult-quartz-white-' + data.month">{{ data.white_defect.toFixed(3) }}</td>
+                                        <td class="avg-header">{{ reportData.quartz.vendor_averages['ULT'].avg_white_defect.toFixed(3) }}</td>
+                                    </tr>
+                                    <tr v-else>
+                                        <td class="data-column">白缺陷</td>
+                                        <td v-for="n in 12" :key="'quartz-white-' + n">0.000</td>
+                                        <td class="avg-header">0.000</td>
+                                    </tr>
+                                    <tr v-if="reportData.vendors.find(vendor => vendor === 'ULT') && reportData.quartz.vendor_data['ULT']">
+                                        <td class="data-column">黑缺陷</td>
+                                        <td v-for="data in reportData.quartz.vendor_data['ULT']" :key="'ult-quartz-black-' + data.month">{{ data.black_defect.toFixed(3) }}</td>
+                                        <td class="avg-header">{{ reportData.quartz.vendor_averages['ULT'].avg_black_defect.toFixed(3) }}</td>
+                                    </tr>
+                                    <tr v-else>
+                                        <td class="data-column">黑缺陷</td>
+                                        <td v-for="n in 12" :key="'quartz-black-' + n">0.000</td>
+                                        <td class="avg-header">0.000</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                                 
                                 <!-- Soda缺陷密度（平均值） -->
                                 <div class="table-section">
-                                    <h3>Soda缺陷密度（平均值）</h3>
-                                    <table>
-                                        <thead>
-                                            <tr>
-                                                <th rowspan="2" class="data-column"></th>
-                                                <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
-                                                <th rowspan="2" class="avg-header">平均值</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td class="data-column">生产数</td>
-                                                <td v-for="data in reportData.soda.monthly_data" :key="'soda-prod-' + data.month">{{ data.production }}</td>
-                                                <td class="avg-header">{{ reportData.soda.avg_production }}</td>
-                                            </tr>
-                                            <tr>
-                                                <td class="data-column">白缺陷</td>
-                                                <td v-for="data in reportData.soda.monthly_data" :key="'soda-white-' + data.month">{{ data.white_defect }}</td>
-                                                <td class="avg-header">{{ reportData.soda.avg_white_defect }}</td>
-                                            </tr>
-                                            <tr>
-                                                <td class="data-column">黑缺陷</td>
-                                                <td v-for="data in reportData.soda.monthly_data" :key="'soda-black-' + data.month">{{ data.black_defect }}</td>
-                                                <td class="avg-header">{{ reportData.soda.avg_black_defect }}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
+                            <h3>Soda缺陷密度（平均值）</h3>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th rowspan="2" class="data-column"></th>
+                                        <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
+                                        <th rowspan="2" class="avg-header">平均值</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-if="reportData.vendors.find(vendor => vendor === 'ULT') && reportData.soda.vendor_data['ULT']">
+                                        <td class="data-column">生产数</td>
+                                        <td v-for="data in reportData.soda.vendor_data['ULT']" :key="'ult-soda-prod-' + data.month">{{ data.production }}</td>
+                                        <td class="avg-header">{{ reportData.soda.vendor_averages['ULT'].avg_production }}</td>
+                                    </tr>
+                                    <tr v-else>
+                                        <td class="data-column">生产数</td>
+                                        <td v-for="n in 12" :key="'soda-prod-' + n">0</td>
+                                        <td class="avg-header">0</td>
+                                    </tr>
+                                    <tr v-if="reportData.vendors.find(vendor => vendor === 'ULT') && reportData.soda.vendor_data['ULT']">
+                                        <td class="data-column">白缺陷</td>
+                                        <td v-for="data in reportData.soda.vendor_data['ULT']" :key="'ult-soda-white-' + data.month">{{ data.white_defect.toFixed(3) }}</td>
+                                        <td class="avg-header">{{ reportData.soda.vendor_averages['ULT'].avg_white_defect.toFixed(3) }}</td>
+                                    </tr>
+                                    <tr v-else>
+                                        <td class="data-column">白缺陷</td>
+                                        <td v-for="n in 12" :key="'soda-white-' + n">0.000</td>
+                                        <td class="avg-header">0.000</td>
+                                    </tr>
+                                    <tr v-if="reportData.vendors.find(vendor => vendor === 'ULT') && reportData.soda.vendor_data['ULT']">
+                                        <td class="data-column">黑缺陷</td>
+                                        <td v-for="data in reportData.soda.vendor_data['ULT']" :key="'ult-soda-black-' + data.month">{{ data.black_defect.toFixed(3) }}</td>
+                                        <td class="avg-header">{{ reportData.soda.vendor_averages['ULT'].avg_black_defect.toFixed(3) }}</td>
+                                    </tr>
+                                    <tr v-else>
+                                        <td class="data-column">黑缺陷</td>
+                                        <td v-for="n in 12" :key="'soda-black-' + n">0.000</td>
+                                        <td class="avg-header">0.000</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                             </div>
                             
                             <!-- ULH部分 -->
@@ -419,65 +479,95 @@
                                 
                                 <!-- Quartz缺陷密度（平均值） -->
                                 <div class="table-section">
-                                    <h3>Quartz缺陷密度（平均值）</h3>
-                                    <table>
-                                        <thead>
-                                            <tr>
-                                                <th rowspan="2" class="data-column"></th>
-                                                <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
-                                                <th rowspan="2" class="avg-header">平均值</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td class="data-column">生产数</td>
-                                                <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-prod-' + data.month">{{ data.production }}</td>
-                                                <td class="avg-header">{{ reportData.quartz.avg_production }}</td>
-                                            </tr>
-                                            <tr>
-                                                <td class="data-column">白缺陷</td>
-                                                <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-white-' + data.month">{{ data.white_defect }}</td>
-                                                <td class="avg-header">{{ reportData.quartz.avg_white_defect }}</td>
-                                            </tr>
-                                            <tr>
-                                                <td class="data-column">黑缺陷</td>
-                                                <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-black-' + data.month">{{ data.black_defect }}</td>
-                                                <td class="avg-header">{{ reportData.quartz.avg_black_defect }}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
+                            <h3>Quartz缺陷密度（平均值）</h3>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th rowspan="2" class="data-column"></th>
+                                        <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
+                                        <th rowspan="2" class="avg-header">平均值</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-if="reportData.vendors.find(vendor => vendor === 'ULH') && reportData.quartz.vendor_data['ULH']">
+                                        <td class="data-column">生产数</td>
+                                        <td v-for="data in reportData.quartz.vendor_data['ULH']" :key="'ulh-quartz-prod-' + data.month">{{ data.production }}</td>
+                                        <td class="avg-header">{{ reportData.quartz.vendor_averages['ULH'].avg_production }}</td>
+                                    </tr>
+                                    <tr v-else>
+                                        <td class="data-column">生产数</td>
+                                        <td v-for="n in 12" :key="'quartz-prod-' + n">0</td>
+                                        <td class="avg-header">0</td>
+                                    </tr>
+                                    <tr v-if="reportData.vendors.find(vendor => vendor === 'ULH') && reportData.quartz.vendor_data['ULH']">
+                                        <td class="data-column">白缺陷</td>
+                                        <td v-for="data in reportData.quartz.vendor_data['ULH']" :key="'ulh-quartz-white-' + data.month">{{ data.white_defect.toFixed(3) }}</td>
+                                        <td class="avg-header">{{ reportData.quartz.vendor_averages['ULH'].avg_white_defect.toFixed(3) }}</td>
+                                    </tr>
+                                    <tr v-else>
+                                        <td class="data-column">白缺陷</td>
+                                        <td v-for="n in 12" :key="'quartz-white-' + n">0.000</td>
+                                        <td class="avg-header">0.000</td>
+                                    </tr>
+                                    <tr v-if="reportData.vendors.find(vendor => vendor === 'ULH') && reportData.quartz.vendor_data['ULH']">
+                                        <td class="data-column">黑缺陷</td>
+                                        <td v-for="data in reportData.quartz.vendor_data['ULH']" :key="'ulh-quartz-black-' + data.month">{{ data.black_defect.toFixed(3) }}</td>
+                                        <td class="avg-header">{{ reportData.quartz.vendor_averages['ULH'].avg_black_defect.toFixed(3) }}</td>
+                                    </tr>
+                                    <tr v-else>
+                                        <td class="data-column">黑缺陷</td>
+                                        <td v-for="n in 12" :key="'quartz-black-' + n">0.000</td>
+                                        <td class="avg-header">0.000</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                                 
                                 <!-- Soda缺陷密度（平均值） -->
                                 <div class="table-section">
-                                    <h3>Soda缺陷密度（平均值）</h3>
-                                    <table>
-                                        <thead>
-                                            <tr>
-                                                <th rowspan="2" class="data-column"></th>
-                                                <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
-                                                <th rowspan="2" class="avg-header">平均值</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td class="data-column">生产数</td>
-                                                <td v-for="data in reportData.soda.monthly_data" :key="'soda-prod-' + data.month">{{ data.production }}</td>
-                                                <td class="avg-header">{{ reportData.soda.avg_production }}</td>
-                                            </tr>
-                                            <tr>
-                                                <td class="data-column">白缺陷</td>
-                                                <td v-for="data in reportData.soda.monthly_data" :key="'soda-white-' + data.month">{{ data.white_defect }}</td>
-                                                <td class="avg-header">{{ reportData.soda.avg_white_defect }}</td>
-                                            </tr>
-                                            <tr>
-                                                <td class="data-column">黑缺陷</td>
-                                                <td v-for="data in reportData.soda.monthly_data" :key="'soda-black-' + data.month">{{ data.black_defect }}</td>
-                                                <td class="avg-header">{{ reportData.soda.avg_black_defect }}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
+                            <h3>Soda缺陷密度（平均值）</h3>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th rowspan="2" class="data-column"></th>
+                                        <th v-for="month in 12" :key="month" class="month-header">{{ month }}月</th>
+                                        <th rowspan="2" class="avg-header">平均值</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-if="reportData.vendors.find(vendor => vendor === 'ULH') && reportData.soda.vendor_data['ULH']">
+                                        <td class="data-column">生产数</td>
+                                        <td v-for="data in reportData.soda.vendor_data['ULH']" :key="'ulh-soda-prod-' + data.month">{{ data.production }}</td>
+                                        <td class="avg-header">{{ reportData.soda.vendor_averages['ULH'].avg_production }}</td>
+                                    </tr>
+                                    <tr v-else>
+                                        <td class="data-column">生产数</td>
+                                        <td v-for="n in 12" :key="'soda-prod-' + n">0</td>
+                                        <td class="avg-header">0</td>
+                                    </tr>
+                                    <tr v-if="reportData.vendors.find(vendor => vendor === 'ULH') && reportData.soda.vendor_data['ULH']">
+                                        <td class="data-column">白缺陷</td>
+                                        <td v-for="data in reportData.soda.vendor_data['ULH']" :key="'ulh-soda-white-' + data.month">{{ data.white_defect.toFixed(3) }}</td>
+                                        <td class="avg-header">{{ reportData.soda.vendor_averages['ULH'].avg_white_defect.toFixed(3) }}</td>
+                                    </tr>
+                                    <tr v-else>
+                                        <td class="data-column">白缺陷</td>
+                                        <td v-for="n in 12" :key="'soda-white-' + n">0.000</td>
+                                        <td class="avg-header">0.000</td>
+                                    </tr>
+                                    <tr v-if="reportData.vendors.find(vendor => vendor === 'ULH') && reportData.soda.vendor_data['ULH']">
+                                        <td class="data-column">黑缺陷</td>
+                                        <td v-for="data in reportData.soda.vendor_data['ULH']" :key="'ulh-soda-black-' + data.month">{{ data.black_defect.toFixed(3) }}</td>
+                                        <td class="avg-header">{{ reportData.soda.vendor_averages['ULH'].avg_black_defect.toFixed(3) }}</td>
+                                    </tr>
+                                    <tr v-else>
+                                        <td class="data-column">黑缺陷</td>
+                                        <td v-for="n in 12" :key="'soda-black-' + n">0.000</td>
+                                        <td class="avg-header">0.000</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                             </div>
                         </div>
                         
@@ -503,20 +593,35 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr>
+                                        <tr v-if="reportData.vendors.find(vendor => vendor === 'HOYA') && reportData.quartz.vendor_data['HOYA']">
                                             <td class="data-column">生产数</td>
-                                            <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-prod-' + data.month">{{ data.production }}</td>
-                                            <td class="avg-header">{{ reportData.quartz.avg_production }}</td>
+                                            <td v-for="data in reportData.quartz.vendor_data['HOYA']" :key="'hoya-quartz-prod-' + data.month">{{ data.production }}</td>
+                                            <td class="avg-header">{{ reportData.quartz.vendor_averages['HOYA'].avg_production }}</td>
                                         </tr>
-                                        <tr>
+                                        <tr v-else>
+                                            <td class="data-column">生产数</td>
+                                            <td v-for="n in 12" :key="'quartz-prod-' + n">0</td>
+                                            <td class="avg-header">0</td>
+                                        </tr>
+                                        <tr v-if="reportData.vendors.find(vendor => vendor === 'HOYA') && reportData.quartz.vendor_data['HOYA']">
                                             <td class="data-column">白缺陷</td>
-                                            <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-white-' + data.month">{{ data.white_defect }}</td>
-                                            <td class="avg-header">{{ reportData.quartz.avg_white_defect }}</td>
+                                            <td v-for="data in reportData.quartz.vendor_data['HOYA']" :key="'hoya-quartz-white-' + data.month">{{ data.white_defect.toFixed(3) }}</td>
+                                            <td class="avg-header">{{ reportData.quartz.vendor_averages['HOYA'].avg_white_defect.toFixed(3) }}</td>
                                         </tr>
-                                        <tr>
+                                        <tr v-else>
+                                            <td class="data-column">白缺陷</td>
+                                            <td v-for="n in 12" :key="'quartz-white-' + n">0.000</td>
+                                            <td class="avg-header">0.000</td>
+                                        </tr>
+                                        <tr v-if="reportData.vendors.find(vendor => vendor === 'HOYA') && reportData.quartz.vendor_data['HOYA']">
                                             <td class="data-column">黑缺陷</td>
-                                            <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-black-' + data.month">{{ data.black_defect }}</td>
-                                            <td class="avg-header">{{ reportData.quartz.avg_black_defect }}</td>
+                                            <td v-for="data in reportData.quartz.vendor_data['HOYA']" :key="'hoya-quartz-black-' + data.month">{{ data.black_defect.toFixed(3) }}</td>
+                                            <td class="avg-header">{{ reportData.quartz.vendor_averages['HOYA'].avg_black_defect.toFixed(3) }}</td>
+                                        </tr>
+                                        <tr v-else>
+                                            <td class="data-column">黑缺陷</td>
+                                            <td v-for="n in 12" :key="'quartz-black-' + n">0.000</td>
+                                            <td class="avg-header">0.000</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -533,29 +638,44 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr>
+                                        <tr v-if="reportData.vendors.find(vendor => vendor === 'HOYA') && reportData.soda.vendor_data['HOYA']">
                                             <td class="data-column">生产数</td>
-                                            <td v-for="data in reportData.soda.monthly_data" :key="'soda-prod-' + data.month">{{ data.production }}</td>
-                                            <td class="avg-header">{{ reportData.soda.avg_production }}</td>
+                                            <td v-for="data in reportData.soda.vendor_data['HOYA']" :key="'hoya-soda-prod-' + data.month">{{ data.production }}</td>
+                                            <td class="avg-header">{{ reportData.soda.vendor_averages['HOYA'].avg_production }}</td>
                                         </tr>
-                                        <tr>
+                                        <tr v-else>
+                                            <td class="data-column">生产数</td>
+                                            <td v-for="n in 12" :key="'soda-prod-' + n">0</td>
+                                            <td class="avg-header">0</td>
+                                        </tr>
+                                        <tr v-if="reportData.vendors.find(vendor => vendor === 'HOYA') && reportData.soda.vendor_data['HOYA']">
                                             <td class="data-column">白缺陷</td>
-                                            <td v-for="data in reportData.soda.monthly_data" :key="'soda-white-' + data.month">{{ data.white_defect }}</td>
-                                            <td class="avg-header">{{ reportData.soda.avg_white_defect }}</td>
+                                            <td v-for="data in reportData.soda.vendor_data['HOYA']" :key="'hoya-soda-white-' + data.month">{{ data.white_defect.toFixed(3) }}</td>
+                                            <td class="avg-header">{{ reportData.soda.vendor_averages['HOYA'].avg_white_defect.toFixed(3) }}</td>
                                         </tr>
-                                        <tr>
+                                        <tr v-else>
+                                            <td class="data-column">白缺陷</td>
+                                            <td v-for="n in 12" :key="'soda-white-' + n">0.000</td>
+                                            <td class="avg-header">0.000</td>
+                                        </tr>
+                                        <tr v-if="reportData.vendors.find(vendor => vendor === 'HOYA') && reportData.soda.vendor_data['HOYA']">
                                             <td class="data-column">黑缺陷</td>
-                                            <td v-for="data in reportData.soda.monthly_data" :key="'soda-black-' + data.month">{{ data.black_defect }}</td>
-                                            <td class="avg-header">{{ reportData.soda.avg_black_defect }}</td>
+                                            <td v-for="data in reportData.soda.vendor_data['HOYA']" :key="'hoya-soda-black-' + data.month">{{ data.black_defect.toFixed(3) }}</td>
+                                            <td class="avg-header">{{ reportData.soda.vendor_averages['HOYA'].avg_black_defect.toFixed(3) }}</td>
+                                        </tr>
+                                        <tr v-else>
+                                            <td class="data-column">黑缺陷</td>
+                                            <td v-for="n in 12" :key="'soda-black-' + n">0.000</td>
+                                            <td class="avg-header">0.000</td>
                                         </tr>
                                     </tbody>
                                 </table>
                             </div>
                         </div>
                         
-                        <!-- SS标签页 -->
-                        <div v-show="activeTab === 'ss'" class="tab-pane">
-                            <!-- SS内容 -->
+                        <!-- S&S标签页 -->
+                        <div v-show="activeTab === 's&s'" class="tab-pane">
+                            <!-- S&S内容 -->
                             <!-- 折线图 -->
                             <div class="chart-section">
                                 <h3>缺陷趋势对比</h3>
@@ -575,20 +695,35 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr>
+                                        <tr v-if="reportData.vendors.find(vendor => vendor === 'S&S') && reportData.quartz.vendor_data['S&S']">
                                             <td class="data-column">生产数</td>
-                                            <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-prod-' + data.month">{{ data.production }}</td>
-                                            <td class="avg-header">{{ reportData.quartz.avg_production }}</td>
+                                            <td v-for="data in reportData.quartz.vendor_data['S&S']" :key="'ss-quartz-prod-' + data.month">{{ data.production }}</td>
+                                            <td class="avg-header">{{ reportData.quartz.vendor_averages['S&S'].avg_production }}</td>
                                         </tr>
-                                        <tr>
+                                        <tr v-else>
+                                            <td class="data-column">生产数</td>
+                                            <td v-for="n in 12" :key="'quartz-prod-' + n">0</td>
+                                            <td class="avg-header">0</td>
+                                        </tr>
+                                        <tr v-if="reportData.vendors.find(vendor => vendor === 'S&S') && reportData.quartz.vendor_data['S&S']">
                                             <td class="data-column">白缺陷</td>
-                                            <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-white-' + data.month">{{ data.white_defect }}</td>
-                                            <td class="avg-header">{{ reportData.quartz.avg_white_defect }}</td>
+                                            <td v-for="data in reportData.quartz.vendor_data['S&S']" :key="'ss-quartz-white-' + data.month">{{ data.white_defect }}</td>
+                                            <td class="avg-header">{{ reportData.quartz.vendor_averages['S&S'].avg_white_defect }}</td>
                                         </tr>
-                                        <tr>
+                                        <tr v-else>
+                                            <td class="data-column">白缺陷</td>
+                                            <td v-for="n in 12" :key="'quartz-white-' + n">0.000</td>
+                                            <td class="avg-header">0.000</td>
+                                        </tr>
+                                        <tr v-if="reportData.vendors.find(vendor => vendor === 'S&S') && reportData.quartz.vendor_data['S&S']">
                                             <td class="data-column">黑缺陷</td>
-                                            <td v-for="data in reportData.quartz.monthly_data" :key="'quartz-black-' + data.month">{{ data.black_defect }}</td>
-                                            <td class="avg-header">{{ reportData.quartz.avg_black_defect }}</td>
+                                            <td v-for="data in reportData.quartz.vendor_data['S&S']" :key="'ss-quartz-black-' + data.month">{{ data.black_defect }}</td>
+                                            <td class="avg-header">{{ reportData.quartz.vendor_averages['S&S'].avg_black_defect }}</td>
+                                        </tr>
+                                        <tr v-else>
+                                            <td class="data-column">黑缺陷</td>
+                                            <td v-for="n in 12" :key="'quartz-black-' + n">0.000</td>
+                                            <td class="avg-header">0.000</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -605,20 +740,35 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr>
+                                        <tr v-if="reportData.vendors.find(vendor => vendor === 'S&S') && reportData.soda.vendor_data['S&S']">
                                             <td class="data-column">生产数</td>
-                                            <td v-for="data in reportData.soda.monthly_data" :key="'soda-prod-' + data.month">{{ data.production }}</td>
-                                            <td class="avg-header">{{ reportData.soda.avg_production }}</td>
+                                            <td v-for="data in reportData.soda.vendor_data['S&S']" :key="'ss-soda-prod-' + data.month">{{ data.production }}</td>
+                                            <td class="avg-header">{{ reportData.soda.vendor_averages['S&S'].avg_production }}</td>
                                         </tr>
-                                        <tr>
+                                        <tr v-else>
+                                            <td class="data-column">生产数</td>
+                                            <td v-for="n in 12" :key="'soda-prod-' + n">0</td>
+                                            <td class="avg-header">0</td>
+                                        </tr>
+                                        <tr v-if="reportData.vendors.find(vendor => vendor === 'S&S') && reportData.soda.vendor_data['S&S']">
                                             <td class="data-column">白缺陷</td>
-                                            <td v-for="data in reportData.soda.monthly_data" :key="'soda-white-' + data.month">{{ data.white_defect }}</td>
-                                            <td class="avg-header">{{ reportData.soda.avg_white_defect }}</td>
+                                            <td v-for="data in reportData.soda.vendor_data['S&S']" :key="'ss-soda-white-' + data.month">{{ data.white_defect.toFixed(3) }}</td>
+                                            <td class="avg-header">{{ reportData.soda.vendor_averages['S&S'].avg_white_defect.toFixed(3) }}</td>
                                         </tr>
-                                        <tr>
+                                        <tr v-else>
+                                            <td class="data-column">白缺陷</td>
+                                            <td v-for="n in 12" :key="'soda-white-' + n">0.000</td>
+                                            <td class="avg-header">0.000</td>
+                                        </tr>
+                                        <tr v-if="reportData.vendors.find(vendor => vendor === 'S&S') && reportData.soda.vendor_data['S&S']">
                                             <td class="data-column">黑缺陷</td>
-                                            <td v-for="data in reportData.soda.monthly_data" :key="'soda-black-' + data.month">{{ data.black_defect }}</td>
-                                            <td class="avg-header">{{ reportData.soda.avg_black_defect }}</td>
+                                            <td v-for="data in reportData.soda.vendor_data['S&S']" :key="'ss-soda-black-' + data.month">{{ data.black_defect.toFixed(3) }}</td>
+                                            <td class="avg-header">{{ reportData.soda.vendor_averages['S&S'].avg_black_defect.toFixed(3) }}</td>
+                                        </tr>
+                                        <tr v-else>
+                                            <td class="data-column">黑缺陷</td>
+                                            <td v-for="n in 12" :key="'soda-black-' + n">0.000</td>
+                                            <td class="avg-header">0.000</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -651,7 +801,7 @@
                     tabs: [
                         { id: 'ul', name: 'UL' },
                         { id: 'hoya', name: 'HOYA' },
-                        { id: 'ss', name: 'SS' }
+                        { id: 's&s', name: 'S&S' }
                     ]
                 }
             },
@@ -684,7 +834,7 @@
                             case 'hoya':
                                 this.createChartHoya();
                                 break;
-                            case 'ss':
+                            case 's&s':
                                 this.createChartSs();
                                 break;
                         }
@@ -699,8 +849,8 @@
                             this.selectedYear = this.availableYears[0];
                         }
                     } catch (error) {
-                        this.availableYears = [2024, 2023, 2022];
-                        this.selectedYear = 2024;
+                        this.availableYears = [2025, 2024, 2023, 2022];
+                        this.selectedYear = 2025;
                     } finally {
                         this.loadingYears = false;
                     }
@@ -723,21 +873,33 @@
                         console.log('API Response data length:', JSON.stringify(response.data).length);
                         this.reportData = response.data;
                         console.log('Report Data:', this.reportData);
-                        
-                        this.$nextTick(() => {
-                            console.log('Creating charts...');
-                            try {
-                                this.createChart();
-                                this.createChartUlt();
-                                this.createChartUlh();
-                                this.createChartHoya();
-                                this.createChartSs();
-                                console.log('All charts created successfully');
-                            } catch (chartError) {
-                                console.error('Error creating charts:', chartError);
-                                this.error = '图表渲染失败: ' + chartError.message;
-                            }
-                        });
+                    
+                    // 添加调试日志，检查S&S供应商数据
+                    if (this.reportData && this.reportData.vendors) {
+                        console.log('Available vendors:', this.reportData.vendors);
+                        console.log('S&S vendor found:', this.reportData.vendors.find(vendor => vendor === 'S&S'));
+                    }
+                    if (this.reportData && this.reportData.quartz && this.reportData.quartz.vendor_data && this.reportData.quartz.vendor_data['S&S']) {
+                        console.log('S&S Quartz data:', this.reportData.quartz.vendor_data['S&S']);
+                    }
+                    if (this.reportData && this.reportData.soda && this.reportData.soda.vendor_data && this.reportData.soda.vendor_data['S&S']) {
+                        console.log('S&S Soda data:', this.reportData.soda.vendor_data['S&S']);
+                    }
+                    
+                    this.$nextTick(() => {
+                        console.log('Creating charts...');
+                        try {
+                            this.createChart();
+                            this.createChartUlt();
+                            this.createChartUlh();
+                            this.createChartHoya();
+                            this.createChartSs();
+                            console.log('All charts created successfully');
+                        } catch (chartError) {
+                            console.error('Error creating charts:', chartError);
+                            this.error = '图表渲染失败: ' + chartError.message;
+                        }
+                    });
                     } catch (error) {
                         console.error('API Request failed:', error);
                         if (error.response) {
@@ -784,7 +946,11 @@
                             return;
                         }
                         
-                        const labels = this.reportData.quartz.monthly_data.map(item => item.month + '月');
+                        // 获取主图表供应商的数据（默认使用总体数据）
+                        const quartzData = this.reportData.quartz.monthly_data;
+                        const sodaData = this.reportData.soda.monthly_data;
+                        
+                        const labels = quartzData.map(item => item.month + '月');
                         if (!labels.length) {
                             console.error('No labels available for chart');
                             this.error = '没有可用的月份数据来创建图表';
@@ -792,12 +958,12 @@
                         }
                         
                         // Quartz缺陷数据
-                        const quartzWhiteDefectData = this.reportData.quartz.monthly_data.map(item => item.white_defect);
-                        const quartzBlackDefectData = this.reportData.quartz.monthly_data.map(item => item.black_defect);
+                        const quartzWhiteDefectData = quartzData.map(item => item.white_defect);
+                        const quartzBlackDefectData = quartzData.map(item => item.black_defect);
                         
                         // Soda缺陷数据
-                        const sodaWhiteDefectData = this.reportData.soda.monthly_data.map(item => item.white_defect);
-                        const sodaBlackDefectData = this.reportData.soda.monthly_data.map(item => item.black_defect);
+                        const sodaWhiteDefectData = sodaData.map(item => item.white_defect);
+                        const sodaBlackDefectData = sodaData.map(item => item.black_defect);
                         
                         console.log('Chart data prepared. Labels count:', labels.length);
                         console.log('Quartz white defects:', quartzWhiteDefectData);
@@ -822,7 +988,7 @@
                                         label: 'Quartz黑缺陷',
                                         data: quartzBlackDefectData,
                                         borderColor: '#722ed1',
-                                        backgroundColor: 'rgba(114, 46, 209, 0.1)',
+                                        backgroundColor: 'rgba(114, 46, 209, 0.1)',
                                         tension: 0.3,
                                         fill: false
                                     },
@@ -830,7 +996,7 @@
                                         label: 'Soda白缺陷',
                                         data: sodaWhiteDefectData,
                                         borderColor: '#52c41a',
-                                        backgroundColor: 'rgba(82, 96, 26, 0.7)',
+                                        backgroundColor: 'rgba(82, 196, 26, 0.1)',
                                         tension: 0.3,
                                         fill: false
                                     },
@@ -838,7 +1004,7 @@
                                         label: 'Soda黑缺陷',
                                         data: sodaBlackDefectData,
                                         borderColor: '#faad14',
-                                        backgroundColor: 'rgba(250 173, 20, 0.1)',
+                                        backgroundColor: 'rgba(250, 173, 20, 0.1)',
                                         tension: 0.3,
                                         fill: false
                                     }
@@ -886,15 +1052,31 @@
                         this.chartUlt.destroy();
                     }
                     
-                    const labels = this.reportData.quartz.monthly_data.map(item => item.month + '月');
+                    // 获取ULT供应商的数据
+                    let quartzData, sodaData;
+                    
+                    // 检查ULT供应商是否存在
+                    if (this.reportData.vendors.find(vendor => vendor === 'ULT') && 
+                        this.reportData.quartz.vendor_data['ULT'] && 
+                        this.reportData.soda.vendor_data['ULT']) {
+                        console.log('Using ULT vendor data'); // 调试日志
+                        quartzData = this.reportData.quartz.vendor_data['ULT'];
+                        sodaData = this.reportData.soda.vendor_data['ULT'];
+                    } else {
+                        console.log('Using default data for ULT'); // 调试日志
+                        quartzData = this.reportData.quartz.monthly_data;
+                        sodaData = this.reportData.soda.monthly_data;
+                    }
+                    
+                    const labels = quartzData.map(item => item.month + '月');
                     
                     // Quartz缺陷数据
-                    const quartzWhiteDefectData = this.reportData.quartz.monthly_data.map(item => item.white_defect);
-                    const quartzBlackDefectData = this.reportData.quartz.monthly_data.map(item => item.black_defect);
+                    const quartzWhiteDefectData = quartzData.map(item => item.white_defect);
+                    const quartzBlackDefectData = quartzData.map(item => item.black_defect);
                     
                     // Soda缺陷数据
-                    const sodaWhiteDefectData = this.reportData.soda.monthly_data.map(item => item.white_defect);
-                    const sodaBlackDefectData = this.reportData.soda.monthly_data.map(item => item.black_defect);
+                    const sodaWhiteDefectData = sodaData.map(item => item.white_defect);
+                    const sodaBlackDefectData = sodaData.map(item => item.black_defect);
                     
                     console.log('ULT Chart data:', { labels, quartzWhiteDefectData, quartzBlackDefectData, sodaWhiteDefectData, sodaBlackDefectData }); // 调试日志
                     
@@ -975,15 +1157,31 @@
                         this.chartUlh.destroy();
                     }
                     
-                    const labels = this.reportData.quartz.monthly_data.map(item => item.month + '月');
+                    // 获取ULH供应商的数据
+                    let quartzData, sodaData;
+                    
+                    // 检查ULH供应商是否存在
+                    if (this.reportData.vendors.find(vendor => vendor === 'ULH') && 
+                        this.reportData.quartz.vendor_data['ULH'] && 
+                        this.reportData.soda.vendor_data['ULH']) {
+                        console.log('Using ULH vendor data'); // 调试日志
+                        quartzData = this.reportData.quartz.vendor_data['ULH'];
+                        sodaData = this.reportData.soda.vendor_data['ULH'];
+                    } else {
+                        console.log('Using default data for ULH'); // 调试日志
+                        quartzData = this.reportData.quartz.monthly_data;
+                        sodaData = this.reportData.soda.monthly_data;
+                    }
+                    
+                    const labels = quartzData.map(item => item.month + '月');
                     
                     // Quartz缺陷数据
-                    const quartzWhiteDefectData = this.reportData.quartz.monthly_data.map(item => item.white_defect);
-                    const quartzBlackDefectData = this.reportData.quartz.monthly_data.map(item => item.black_defect);
+                    const quartzWhiteDefectData = quartzData.map(item => item.white_defect);
+                    const quartzBlackDefectData = quartzData.map(item => item.black_defect);
                     
                     // Soda缺陷数据
-                    const sodaWhiteDefectData = this.reportData.soda.monthly_data.map(item => item.white_defect);
-                    const sodaBlackDefectData = this.reportData.soda.monthly_data.map(item => item.black_defect);
+                    const sodaWhiteDefectData = sodaData.map(item => item.white_defect);
+                    const sodaBlackDefectData = sodaData.map(item => item.black_defect);
                     
                     console.log('ULH Chart data:', { labels, quartzWhiteDefectData, quartzBlackDefectData, sodaWhiteDefectData, sodaBlackDefectData }); // 调试日志
                     
@@ -1064,15 +1262,25 @@
                         this.chartHoya.destroy();
                     }
                     
-                    const labels = this.reportData.quartz.monthly_data.map(item => item.month + '月');
+                    // 获取HOYA供应商的数据
+                    const hoyaVendor = this.reportData.vendors.find(vendor => vendor === 'HOYA');
+                    if (!hoyaVendor || !this.reportData.quartz.vendor_data[hoyaVendor] || !this.reportData.soda.vendor_data[hoyaVendor]) {
+                        console.log('HOYA vendor data not found'); // 调试日志
+                        return;
+                    }
+                    
+                    const quartzData = this.reportData.quartz.vendor_data[hoyaVendor];
+                    const sodaData = this.reportData.soda.vendor_data[hoyaVendor];
+                    
+                    const labels = quartzData.map(item => item.month + '月');
                     
                     // Quartz缺陷数据
-                    const quartzWhiteDefectData = this.reportData.quartz.monthly_data.map(item => item.white_defect);
-                    const quartzBlackDefectData = this.reportData.quartz.monthly_data.map(item => item.black_defect);
+                    const quartzWhiteDefectData = quartzData.map(item => item.white_defect);
+                    const quartzBlackDefectData = quartzData.map(item => item.black_defect);
                     
                     // Soda缺陷数据
-                    const sodaWhiteDefectData = this.reportData.soda.monthly_data.map(item => item.white_defect);
-                    const sodaBlackDefectData = this.reportData.soda.monthly_data.map(item => item.black_defect);
+                    const sodaWhiteDefectData = sodaData.map(item => item.white_defect);
+                    const sodaBlackDefectData = sodaData.map(item => item.black_defect);
                     
                     console.log('HOYA Chart data:', { labels, quartzWhiteDefectData, quartzBlackDefectData, sodaWhiteDefectData, sodaBlackDefectData }); // 调试日志
                     
@@ -1142,10 +1350,10 @@
                 },
                 
                 createChartSs() {
-                    console.log('Creating SS chart...'); // 调试日志
+                    console.log('Creating S&S chart...'); // 调试日志
                     const ctx = document.getElementById('defectChartSs');
                     if (!ctx) {
-                        console.log('SS chart canvas not found'); // 调试日志
+                        console.log('S&S chart canvas not found'); // 调试日志
                         return;
                     }
                     
@@ -1153,17 +1361,27 @@
                         this.chartSs.destroy();
                     }
                     
-                    const labels = this.reportData.quartz.monthly_data.map(item => item.month + '月');
+                    // 获取S&S供应商的数据
+                    const ssVendor = this.reportData.vendors.find(vendor => vendor === 'S&S');
+                    if (!ssVendor || !this.reportData.quartz.vendor_data[ssVendor] || !this.reportData.soda.vendor_data[ssVendor]) {
+                        console.log('S&S vendor data not found'); // 调试日志
+                        return;
+                    }
+                    
+                    const quartzData = this.reportData.quartz.vendor_data[ssVendor];
+                    const sodaData = this.reportData.soda.vendor_data[ssVendor];
+                    
+                    const labels = quartzData.map(item => item.month + '月');
                     
                     // Quartz缺陷数据
-                    const quartzWhiteDefectData = this.reportData.quartz.monthly_data.map(item => item.white_defect);
-                    const quartzBlackDefectData = this.reportData.quartz.monthly_data.map(item => item.black_defect);
+                    const quartzWhiteDefectData = quartzData.map(item => item.white_defect);
+                    const quartzBlackDefectData = quartzData.map(item => item.black_defect);
                     
                     // Soda缺陷数据
-                    const sodaWhiteDefectData = this.reportData.soda.monthly_data.map(item => item.white_defect);
-                    const sodaBlackDefectData = this.reportData.soda.monthly_data.map(item => item.black_defect);
+                    const sodaWhiteDefectData = sodaData.map(item => item.white_defect);
+                    const sodaBlackDefectData = sodaData.map(item => item.black_defect);
                     
-                    console.log('SS Chart data:', { labels, quartzWhiteDefectData, quartzBlackDefectData, sodaWhiteDefectData, sodaBlackDefectData }); // 调试日志
+                    console.log('S&S Chart data:', { labels, quartzWhiteDefectData, quartzBlackDefectData, sodaWhiteDefectData, sodaBlackDefectData }); // 调试日志
                     
                     this.chartSs = new Chart(ctx, {
                         type: 'line',
@@ -1227,7 +1445,7 @@
                             }
                         }
                     });
-                    console.log('SS chart created successfully'); // 调试日志
+                    console.log('S&S chart created successfully'); // 调试日志
                 }
             }
         }).mount('#app');

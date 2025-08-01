@@ -158,7 +158,7 @@ class ReportSystemHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 super().do_GET()
         elif self.path == '/api/years':
-            response = {'years': [2024, 2023, 2022, 2021]}
+            response = {'years': [2025, 2024, 2023, 2022]}
             response_data = json.dumps(response).encode()
             content_length = len(response_data)
             self.send_response(200)
@@ -193,68 +193,262 @@ class ReportSystemHandler(http.server.SimpleHTTPRequestHandler):
         
         try:
             data = json.loads(post_data.decode())
-            year = data.get('year', 2024)
+            year = data.get('year', 2025)
             
-            # 生成Quartz数据
-            quartz_data = []
-            total_quartz_production = 0
-            total_quartz_white_defect = 0
-            total_quartz_black_defect = 0
+            # 连接数据库获取真实数据
+            conn = get_db_connection()
+            if not conn:
+                raise Exception("数据库连接失败")
             
-            # 生成Soda数据
-            soda_data = []
-            total_soda_production = 0
-            total_soda_white_defect = 0
-            total_soda_black_defect = 0
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            # 执行SQL查询，按年份筛选
+            sql = """
+                SELECT 
+                    DATE_TRUNC('month', l.event_time) AS month,  -- 按月份截断时间
+                    CASE WHEN cd.vendor IS NULL THEN 'Unknown' ELSE cd.vendor END AS vendor,  -- 供应商字段，保持原始供应商名称，NULL值转换为'Unknown'
+                    CASE 
+                        WHEN SUBSTRING(cd.consumable_def_name FROM 4 FOR 2) = '02' THEN 'Quartz'
+                        WHEN SUBSTRING(cd.consumable_def_name FROM 4 FOR 2) = '01' THEN 'Soda'
+                        ELSE 'Other'  -- 如果不是01或02，可以归类为Other或其他默认值
+                    END AS material_type,  -- 区分Quartz和Soda
+                    COUNT(*) AS shipped_lot_count,  -- 统计shipped状态的lot数量
+                    ROUND(AVG(
+                        (SELECT COUNT(aafi.sno)::float
+                         FROM analyze_aoi_field_item aafi
+                         LEFT JOIN analyze_aoi_field aaf ON aaf.id = aafi.af_id
+                         WHERE aafi.kind IN ('A1','A2','A3','A4')
+                         AND aaf.process_flow_seq_name = 'C4010'
+                         AND aaf.order_no = l.lot_name)
+                    )::numeric, 3) AS avg_black,  -- 计算black的平均值
+                    ROUND(AVG(
+                        (SELECT COUNT(aafi.sno)::float
+                         FROM analyze_aoi_field_item aafi
+                         LEFT JOIN analyze_aoi_field aaf ON aaf.id = aafi.af_id
+                         WHERE aafi.kind IN ('B1','B2','B3','B4')
+                         AND aaf.process_flow_seq_name = 'C4010'
+                         AND aaf.order_no = l.lot_name)
+                    )::numeric, 3) AS avg_white   -- 计算white的平均值
+                FROM lot l
+                LEFT JOIN consumable_def cd ON l.material_def_id = cd.consumable_def_name  -- 添加关联条件
+                WHERE l.lot_state = 'Shipped'
+                    AND EXTRACT(YEAR FROM l.event_time) = %s
+                GROUP BY DATE_TRUNC('month', l.event_time), CASE WHEN cd.vendor IS NULL THEN 'Unknown' ELSE cd.vendor END,
+                         CASE 
+                             WHEN SUBSTRING(cd.consumable_def_name FROM 4 FOR 2) = '02' THEN 'Quartz'
+                             WHEN SUBSTRING(cd.consumable_def_name FROM 4 FOR 2) = '01' THEN 'Soda'
+                             ELSE 'Other'
+                         END;  -- 按月份、vendor和material_type分组
+            """
+            cur.execute(sql, (year,))
+            results = cur.fetchall()
+            conn.close()
             
-            for month in range(1, 13):
-                # Quartz数据
-                quartz_production = random.randint(400, 600)
-                quartz_white_defect = random.randint(10, 40)
-                quartz_black_defect = random.randint(5, 25)
-                
-                quartz_data.append({
-                    'month': month,
-                    'production': quartz_production,
-                    'white_defect': quartz_white_defect,
-                    'black_defect': quartz_black_defect
-                })
-                
-                total_quartz_production += quartz_production
-                total_quartz_white_defect += quartz_white_defect
-                total_quartz_black_defect += quartz_black_defect
-                
-                # Soda数据
-                soda_production = random.randint(400, 600)
-                soda_white_defect = random.randint(10, 40)
-                soda_black_defect = random.randint(5, 25)
-                
-                soda_data.append({
-                    'month': month,
-                    'production': soda_production,
-                    'white_defect': soda_white_defect,
-                    'black_defect': soda_black_defect
-                })
-                
-                total_soda_production += soda_production
-                total_soda_white_defect += soda_white_defect
-                total_soda_black_defect += soda_black_defect
+            # 处理查询结果，按材料类型和供应商分组
+            material_data = {
+                'Quartz': {},
+                'Soda': {},
+                'Other': {}
+            }
             
-            # 计算平均值
+            # 收集所有供应商
+            vendors = set()
+            
+            for row in results:
+                month = row['month'].month  # 提取月份
+                material_type = row['material_type']
+                vendor = row['vendor']
+                vendors.add(vendor)
+                
+                # 初始化该材料类型和月份的供应商数据
+                if month not in material_data[material_type]:
+                    material_data[material_type][month] = {
+                        'month': month,
+                        'production': 0,
+                        'white_defect': 0.0,
+                        'black_defect': 0.0,
+                        'vendors': {}
+                    }
+                
+                # 初始化供应商数据
+                if vendor not in material_data[material_type][month]['vendors']:
+                    material_data[material_type][month]['vendors'][vendor] = {
+                        'production': 0,
+                        'white_defect': 0.0,
+                        'black_defect': 0.0
+                    }
+                
+                # 累加供应商数据
+                material_data[material_type][month]['vendors'][vendor]['production'] += float(row['shipped_lot_count'])
+                material_data[material_type][month]['vendors'][vendor]['white_defect'] += float(row['avg_white'])
+                material_data[material_type][month]['vendors'][vendor]['black_defect'] += float(row['avg_black'])
+                
+                # 累加总数据
+                material_data[material_type][month]['production'] += float(row['shipped_lot_count'])
+                material_data[material_type][month]['white_defect'] += float(row['avg_white'])
+                material_data[material_type][month]['black_defect'] += float(row['avg_black'])
+            
+            # 转换供应商集合为列表
+            vendors = sorted(list(vendors))
+            
+            # 准备返回数据
             report_data = {
+                'vendors': vendors,  # 所有供应商列表
                 'quartz': {
-                    'monthly_data': quartz_data,
-                    'avg_production': round(total_quartz_production / 12),
-                    'avg_white_defect': round(total_quartz_white_defect / 12),
-                    'avg_black_defect': round(total_quartz_black_defect / 12)
+                    'monthly_data': [],
+                    'avg_production': 0,
+                    'avg_white_defect': 0,
+                    'avg_black_defect': 0
                 },
                 'soda': {
-                    'monthly_data': soda_data,
-                    'avg_production': round(total_soda_production / 12),
-                    'avg_white_defect': round(total_soda_white_defect / 12),
-                    'avg_black_defect': round(total_soda_black_defect / 12)
+                    'monthly_data': [],
+                    'avg_production': 0,
+                    'avg_white_defect': 0,
+                    'avg_black_defect': 0
                 }
             }
+            
+            # 处理Quartz数据
+            total_quartz_production = 0
+            total_quartz_white = 0
+            total_quartz_black = 0
+            
+            for month in range(1, 13):
+                if month in material_data['Quartz']:
+                    data = material_data['Quartz'][month].copy()
+                    # 计算平均缺陷值（基于所有供应商的平均值）
+                    vendor_count = len(data['vendors'])
+                    data['white_defect'] = round(data['white_defect'] / vendor_count, 2) if vendor_count > 0 else 0
+                    data['black_defect'] = round(data['black_defect'] / vendor_count, 2) if vendor_count > 0 else 0
+                    report_data['quartz']['monthly_data'].append(data)
+                    total_quartz_production += data['production']
+                    total_quartz_white += data['white_defect']
+                    total_quartz_black += data['black_defect']
+                else:
+                    report_data['quartz']['monthly_data'].append({
+                        'month': month,
+                        'production': 0,
+                        'white_defect': 0,
+                        'black_defect': 0,
+                        'vendors': {}
+                    })
+            
+            # 计算Quartz平均值（按实际有数据的月份数平均）
+            quartz_month_count = sum(1 for data in report_data['quartz']['monthly_data'] if data['production'] > 0 or data['white_defect'] > 0 or data['black_defect'] > 0)
+            report_data['quartz']['avg_production'] = round(total_quartz_production / quartz_month_count) if total_quartz_production and quartz_month_count > 0 else 0
+            report_data['quartz']['avg_white_defect'] = round(total_quartz_white / quartz_month_count, 2) if total_quartz_white and quartz_month_count > 0 else 0
+            report_data['quartz']['avg_black_defect'] = round(total_quartz_black / quartz_month_count, 2) if total_quartz_black and quartz_month_count > 0 else 0
+            
+            # 添加供应商详细数据
+            report_data['quartz']['vendor_data'] = {}
+            # 为每个供应商计算平均值
+            report_data['quartz']['vendor_averages'] = {}
+            for vendor in vendors:
+                report_data['quartz']['vendor_data'][vendor] = []
+                vendor_total_production = 0
+                vendor_total_white = 0
+                vendor_total_black = 0
+                vendor_month_count = 0
+                
+                for month in range(1, 13):
+                    if month in material_data['Quartz'] and vendor in material_data['Quartz'][month]['vendors']:
+                        vendor_data = material_data['Quartz'][month]['vendors'][vendor]
+                        report_data['quartz']['vendor_data'][vendor].append({
+                            'month': month,
+                            'production': vendor_data['production'],
+                            'white_defect': vendor_data['white_defect'],
+                            'black_defect': vendor_data['black_defect']
+                        })
+                        vendor_total_production += vendor_data['production']
+                        vendor_total_white += vendor_data['white_defect']
+                        vendor_total_black += vendor_data['black_defect']
+                        vendor_month_count += 1
+                    else:
+                        report_data['quartz']['vendor_data'][vendor].append({
+                            'month': month,
+                            'production': 0,
+                            'white_defect': 0,
+                            'black_defect': 0
+                        })
+                
+                # 计算该供应商的平均值
+                report_data['quartz']['vendor_averages'][vendor] = {
+                    'avg_production': round(vendor_total_production / vendor_month_count) if vendor_total_production and vendor_month_count > 0 else 0,
+                    'avg_white_defect': round(vendor_total_white / vendor_month_count, 2) if vendor_total_white and vendor_month_count > 0 else 0,
+                    'avg_black_defect': round(vendor_total_black / vendor_month_count, 2) if vendor_total_black and vendor_month_count > 0 else 0
+                }
+            
+            # 处理Soda数据
+            total_soda_production = 0
+            total_soda_white = 0
+            total_soda_black = 0
+            
+            for month in range(1, 13):
+                if month in material_data['Soda']:
+                    data = material_data['Soda'][month].copy()
+                    # 计算平均缺陷值（基于所有供应商的平均值）
+                    vendor_count = len(data['vendors'])
+                    data['white_defect'] = round(data['white_defect'] / vendor_count, 2) if vendor_count > 0 else 0
+                    data['black_defect'] = round(data['black_defect'] / vendor_count, 2) if vendor_count > 0 else 0
+                    report_data['soda']['monthly_data'].append(data)
+                    total_soda_production += data['production']
+                    total_soda_white += data['white_defect']
+                    total_soda_black += data['black_defect']
+                else:
+                    report_data['soda']['monthly_data'].append({
+                        'month': month,
+                        'production': 0,
+                        'white_defect': 0,
+                        'black_defect': 0,
+                        'vendors': {}
+                    })
+            
+            # 计算Soda平均值（按实际有数据的月份数平均）
+            soda_month_count = sum(1 for data in report_data['soda']['monthly_data'] if data['production'] > 0 or data['white_defect'] > 0 or data['black_defect'] > 0)
+            report_data['soda']['avg_production'] = round(total_soda_production / soda_month_count) if total_soda_production and soda_month_count > 0 else 0
+            report_data['soda']['avg_white_defect'] = round(total_soda_white / soda_month_count, 2) if total_soda_white and soda_month_count > 0 else 0
+            report_data['soda']['avg_black_defect'] = round(total_soda_black / soda_month_count, 2) if total_soda_black and soda_month_count > 0 else 0
+            
+            # 添加供应商详细数据
+            report_data['soda']['vendor_data'] = {}
+            # 为每个供应商计算平均值
+            report_data['soda']['vendor_averages'] = {}
+            for vendor in vendors:
+                report_data['soda']['vendor_data'][vendor] = []
+                vendor_total_production = 0
+                vendor_total_white = 0
+                vendor_total_black = 0
+                vendor_month_count = 0
+                
+                for month in range(1, 13):
+                    if month in material_data['Soda'] and vendor in material_data['Soda'][month]['vendors']:
+                        vendor_data = material_data['Soda'][month]['vendors'][vendor]
+                        report_data['soda']['vendor_data'][vendor].append({
+                            'month': month,
+                            'production': vendor_data['production'],
+                            'white_defect': vendor_data['white_defect'],
+                            'black_defect': vendor_data['black_defect']
+                        })
+                        vendor_total_production += vendor_data['production']
+                        vendor_total_white += vendor_data['white_defect']
+                        vendor_total_black += vendor_data['black_defect']
+                        vendor_month_count += 1
+                    else:
+                        report_data['soda']['vendor_data'][vendor].append({
+                            'month': month,
+                            'production': 0,
+                            'white_defect': 0,
+                            'black_defect': 0
+                        })
+                
+                # 计算该供应商的平均值
+                report_data['soda']['vendor_averages'][vendor] = {
+                    'avg_production': round(vendor_total_production / vendor_month_count) if vendor_total_production and vendor_month_count > 0 else 0,
+                    'avg_white_defect': round(vendor_total_white / vendor_month_count, 2) if vendor_total_white and vendor_month_count > 0 else 0,
+                    'avg_black_defect': round(vendor_total_black / vendor_month_count, 2) if vendor_total_black and vendor_month_count > 0 else 0
+                }
+            
+            # 可以选择是否包含Other类型的数据
+            # report_data['other'] = {...}
             
             response_data = json.dumps(report_data).encode()
             content_length = len(response_data)
@@ -514,7 +708,7 @@ class ReportSystemHandler(http.server.SimpleHTTPRequestHandler):
                 AND l.material_id IS NOT NULL
                 AND l.lot_name IS NOT NULL
                 AND l.lot_name != ''
-            ORDER BY l.event_time desc
+            ORDER BY locktime desc
             """
             
             # 移除动态过滤条件以解决参数不匹配问题
@@ -546,8 +740,8 @@ class ReportSystemHandler(http.server.SimpleHTTPRequestHandler):
                         'supplier': str(row_dict.get('vendor', '') or ''),
                         'orderType': str(row_dict.get('lot_type', '') or ''),
                         'size': str(row_dict.get('product_size', '0')) + 'mm',
-                        'blackDefect':str(row_dict.get('black', '') or ''),
-                        'whiteDefect':str(row_dict.get('white', '') or ''),
+                        'blackDefect': str(row_dict.get('black', '') or ''),
+                        'whiteDefect': str(row_dict.get('white', '') or ''),
                         'repairTime': 0,
                         'judgeType': '',
                         'glassSource': '',
@@ -558,7 +752,7 @@ class ReportSystemHandler(http.server.SimpleHTTPRequestHandler):
                         'reprocessPlan': '',
                         'recycleBatch':  '',
                         'factory': 'FS',
-                        'year': row_dict.get('create_date').year if row_dict.get('create_date') else datetime.now().year
+                        'year': int(row_dict.get('create_date').year) if row_dict.get('create_date') else datetime.now().year
                     })
                 except Exception as e:
                     print(f"处理行数据时出错: {e}")
@@ -577,58 +771,6 @@ class ReportSystemHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
                 print(f"获取真实数据失败: {e}")
                 raise e  # 不再回退到模拟数据，直接抛出异常
-
-    def generate_mock_recycling_data(self, filters):
-        """生成服务版使用统计报表的模拟数据(当数据库不可用时)"""
-        customers = ['客户A', '客户B', '客户C', '客户D', '客户E']
-        suppliers = ['供应商1', '供应商2', '供应商3', '供应商4', '供应商5']
-        order_types = ['标准订单', '加急订单', '特殊订单', '批量订单']
-        equipment_list = ['设备A', '设备B', '设备C', '设备D', '设备E']
-        factories = ['工厂1', '工厂2', '工厂3', '工厂4', '工厂5']
-        
-        # 应用过滤器
-        filtered_customers = [c for c in customers if not filters.get('customer') or c == filters['customer']]
-        filtered_suppliers = [s for s in suppliers if not filters.get('supplier') or s == filters['supplier']]
-        filtered_order_types = [t for t in order_types if not filters.get('orderType') or t == filters['orderType']]
-        
-        data = []
-        
-        for i in range(50):
-            customer = random.choice(filtered_customers) if filtered_customers else customers[0]
-            supplier = random.choice(filtered_suppliers) if filtered_suppliers else suppliers[0]
-            order_type = random.choice(filtered_order_types) if filtered_order_types else order_types[0]
-            
-            data.append({
-                'customer': customer,
-                'processNumber': f'PR{str(i + 1).zfill(6)}',
-                'model': f'MOD{str(random.randint(1000, 9999))}',
-                'equipment': random.choice(equipment_list),
-                'cd': round(random.uniform(10, 100), 1),
-                'layer': f'L{random.randint(1, 5)}',
-                'lockTime': self.generate_random_date(),
-                'batchNumber': f'BN{str(random.randint(10000, 99999))}',
-                'supplier': supplier,
-                'orderType': order_type,
-                'size': f'{random.randint(50, 150)}x{random.randint(50, 150)}',
-                'blackDefect': random.randint(0, 20),
-                'whiteDefect': random.randint(0, 15),
-                'repairTime': round(random.uniform(0.5, 5.0), 1),
-                'judgeType': random.choice(['合格', '不合格', '待检']),
-                'glassSource': random.choice(['供应商1', '供应商2', '自产']),
-                'polishSupplier': random.choice(['抛光厂A', '抛光厂B', '抛光厂C']),
-                'chromeSupplier': random.choice(['镀铬厂X', '镀铬厂Y']),
-                'glueSupplier': random.choice(['涂胶厂1', '涂胶厂2', '涂胶厂3']),
-                'recycleStatus': random.choice(['已回收', '未回收', '部分回收']),
-                'reprocessPlan': random.choice(['重新加工', '报废处理', '降级使用']),
-                'recycleBatch': f'RB{str(random.randint(1000, 9999))}',
-                'factory': random.choice(factories)
-            })
-        
-        return {
-            'data': data,
-            'total': len(data),
-            'filters': filters
-        }
 
     def generate_random_date(self):
         """生成随机日期"""
