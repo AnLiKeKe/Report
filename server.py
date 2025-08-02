@@ -211,7 +211,7 @@ class ReportSystemHandler(http.server.SimpleHTTPRequestHandler):
                         WHEN SUBSTRING(cd.consumable_def_name FROM 4 FOR 2) = '01' THEN 'Soda'
                         ELSE 'Other'  -- 如果不是01或02，可以归类为Other或其他默认值
                     END AS material_type,  -- 区分Quartz和Soda
-                    COUNT(*) AS shipped_lot_count,  -- 统计shipped状态的lot数量
+                    COUNT(l.lot_name) AS shipped_lot_count,  -- 统计当月lot_name的个数作为实际生产数量
                     ROUND(AVG(
                         (SELECT COUNT(aafi.sno)::float
                          FROM analyze_aoi_field_item aafi
@@ -241,6 +241,8 @@ class ReportSystemHandler(http.server.SimpleHTTPRequestHandler):
             """
             cur.execute(sql, (year,))
             results = cur.fetchall()
+            # 打印查询结果的前几行，用于调试lot表结构
+            print(f"查询结果前2行: {results[:2]}")
             conn.close()
             
             # 处理查询结果，按材料类型和供应商分组
@@ -358,10 +360,11 @@ class ReportSystemHandler(http.server.SimpleHTTPRequestHandler):
                             'white_defect': vendor_data['white_defect'],
                             'black_defect': vendor_data['black_defect']
                         })
-                        vendor_total_production += vendor_data['production']
-                        vendor_total_white += vendor_data['white_defect']
-                        vendor_total_black += vendor_data['black_defect']
-                        vendor_month_count += 1
+                        if vendor_data['production'] > 0:
+                            vendor_total_production += vendor_data['production']
+                            vendor_total_white += vendor_data['white_defect']
+                            vendor_total_black += vendor_data['black_defect']
+                            vendor_month_count += 1
                     else:
                         report_data['quartz']['vendor_data'][vendor].append({
                             'month': month,
@@ -369,6 +372,12 @@ class ReportSystemHandler(http.server.SimpleHTTPRequestHandler):
                             'white_defect': 0,
                             'black_defect': 0
                         })
+                
+                # 添加调试日志
+                print(f"供应商: {vendor}")
+                print(f"总生产数: {vendor_total_production}")
+                print(f"有效月份数: {vendor_month_count}")
+                print(f"平均生产数: {vendor_total_production / vendor_month_count if vendor_total_production and vendor_month_count > 0 else 0}")
                 
                 # 计算该供应商的平均值
                 report_data['quartz']['vendor_averages'][vendor] = {
@@ -703,19 +712,21 @@ class ReportSystemHandler(http.server.SimpleHTTPRequestHandler):
                 lot l 
                 INNER JOIN consumable_def cd ON l.material_def_id = cd.consumable_def_name
             WHERE 
-                cd.description LIKE '%%R%%'
+                cd.description LIKE 'R%%'
                 AND cd.consumable_type = '主原材料'
                 AND l.material_id IS NOT NULL
                 AND l.lot_name IS NOT NULL
                 AND l.lot_name != ''
+                AND EXTRACT(YEAR FROM l.event_time) = %s
             ORDER BY locktime desc
             """
             
-            # 移除动态过滤条件以解决参数不匹配问题
-            conditions = []
-            params = []
+            # 添加年份过滤条件
+            params = [year]
             
-            # 添加WHERE子句
+            # 添加额外WHERE子句
+            conditions = []
+            
             if conditions:
                 sql_query += " AND " + " AND ".join(conditions)
             
@@ -812,7 +823,7 @@ class ThreadedHTTPServer(ThreadingMixIn, socketserver.TCPServer):
     daemon_threads = True
 
 if __name__ == '__main__':
-    PORT = 8000
+    PORT = 8003
     Handler = ReportSystemHandler
     with ThreadedHTTPServer(('', PORT), Handler) as httpd:
         print(f"服务器运行在 http://localhost:{PORT}")

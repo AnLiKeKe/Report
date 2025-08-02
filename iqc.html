@@ -6,7 +6,8 @@
     <title>IQC缺陷分析</title>
     <script src="vue.global.js"></script>
     <script src="axios.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <!-- Chart.js 本地引用 -->
+    <script src="chart.min.js"></script>
     <style>
             * {
                 margin: 0;
@@ -843,7 +844,7 @@
                 async loadYears() {
                     this.loadingYears = true;
                     try {
-                        const response = await axios.get('http://localhost:8000/api/years');
+                        const response = await axios.get('http://localhost:8003/api/years');
                         this.availableYears = response.data.years;
                         if (this.availableYears.length > 0) {
                             this.selectedYear = this.availableYears[0];
@@ -865,7 +866,7 @@
                     
                     try {
                         console.log(`Fetching report data for year: ${this.selectedYear}`);
-                        const response = await axios.post('http://localhost:8000/api/report', {
+                        const response = await axios.post('http://localhost:8003/api/report', {
                             year: parseInt(this.selectedYear)
                         });
                         console.log('API Response status:', response.status);
